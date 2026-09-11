@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bohio · Contractor Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#ffffff; --ink:#000919; --ink-soft:rgba(0,9,25,0.55); --ink-faint:rgba(0,9,25,0.30);
+    --ink-hairline:rgba(0,9,25,0.12); --paper:#efebeb; --alert:#FF4D6A; --good:#15803d; --warn:#b45309;
+    --plan:rgba(0,9,25,0.16); --plan-line:rgba(0,9,25,0.34);
+    --robot:#0f5c8c; --robot-bg:rgba(15,92,140,0.10); --human:#000919;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--ink);font-family:'Space Grotesk',-apple-system,sans-serif;letter-spacing:.01em;min-height:100vh}
+  ::selection{background:var(--ink);color:var(--bg)}
+  .wrap{max-width:1380px;margin:0 auto;padding:0 26px 120px}
+  .topbar{position:sticky;top:0;z-index:40;background:var(--bg);border-bottom:1px solid var(--ink-hairline);display:flex;align-items:center;gap:26px;padding:16px 26px;max-width:1380px;margin:0 auto}
+  .logo{font-size:18px;letter-spacing:.48em;text-transform:uppercase;font-weight:500}
+  .logo small{font-size:8.5px;letter-spacing:.3em;color:var(--ink-soft);display:block;margin-top:3px}
+  .topbar .pj{margin-left:auto;text-align:right}
+  .topbar .pj b{font-size:13px;font-weight:600}
+  .topbar .pj span{display:block;font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-soft);margin-top:3px}
+  .gear{margin-left:18px;width:38px;height:38px;flex:none;display:flex;align-items:center;justify-content:center;border:1px solid var(--ink-hairline);background:var(--bg);border-radius:50%;cursor:pointer;color:var(--ink-soft);transition:all .15s}
+  .gear:hover,.gear.active{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .gear.active{transform:rotate(45deg)} .gear svg{width:19px;height:19px;display:block}
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--ink-hairline);margin:0 -26px 26px;padding:0 26px;position:sticky;top:65px;background:var(--bg);z-index:30;overflow-x:auto}
+  .tab{padding:15px 15px;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:inherit;margin-bottom:-1px;white-space:nowrap;transition:color .15s}
+  .tab:hover{color:var(--ink)} .tab.active{color:var(--ink);border-bottom-color:var(--ink);font-weight:500}
+  .view{display:none} .view.active{display:block}
+  h2.section{font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:var(--ink-soft);font-weight:500;margin:34px 0 15px;display:flex;align-items:center;gap:14px}
+  h2.section::after{content:"";flex:1;height:1px;background:var(--ink-hairline)}
+  h2.section:first-child{margin-top:6px}
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--ink-hairline);border:1px solid var(--ink-hairline)}
+  .kpi{background:var(--paper);padding:20px 18px}
+  .kpi .label{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft)}
+  .kpi .val{font-size:31px;font-weight:300;margin-top:11px;line-height:1}
+  .kpi .val small{font-size:14px;color:var(--ink-soft)}
+  .kpi .sub{font-size:10.5px;color:var(--ink-soft);margin-top:7px}
+  .kpi .val.good{color:var(--good)} .kpi .val.warn{color:var(--warn)} .kpi .val.bad{color:var(--alert)}
+  .sub .good{color:var(--good)} .sub .warn{color:var(--warn)} .sub .bad{color:var(--alert)}
+  @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  .panel{background:var(--paper);border:1px solid var(--ink-hairline);padding:20px 22px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .grid3{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+  @media(max-width:900px){.grid2{grid-template-columns:1fr}}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);font-weight:500;padding:10px 12px;border-bottom:1px solid var(--ink-hairline);white-space:nowrap}
+  td{padding:12px;border-bottom:1px solid var(--ink-hairline);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .tbl-wrap{border:1px solid var(--ink-hairline);background:var(--paper);overflow-x:auto}
+  .pill{display:inline-block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:20px;border:1px solid;font-weight:500;white-space:nowrap}
+  .pill.done{color:var(--good);border-color:var(--good)} .pill.ontrack{color:var(--ink);border-color:var(--ink-faint)}
+  .pill.atrisk{color:var(--warn);border-color:var(--warn)} .pill.delayed{color:var(--alert);border-color:var(--alert)}
+  .pill.notstarted{color:var(--ink-soft);border-color:var(--ink-hairline)} .pill.tender{color:var(--robot);border-color:var(--robot)}
+  .tag{display:inline-flex;align-items:center;gap:5px;font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:3px;font-weight:600}
+  .tag.robot{color:var(--robot);background:var(--robot-bg)} .tag.human{color:var(--ink);background:rgba(0,9,25,0.06)} .tag.hybrid{color:var(--warn);background:rgba(180,83,9,.1)}
+  .tag i{width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block}
+  .var{font-variant-numeric:tabular-nums;font-weight:500} .var.late{color:var(--alert)} .var.early{color:var(--good)} .var.flat{color:var(--ink-soft)}
+  .mbar{height:6px;background:var(--ink-hairline);border-radius:3px;overflow:hidden;min-width:70px}
+  .mbar>i{display:block;height:100%;background:var(--ink)} .mbar>i.done{background:var(--good)} .mbar>i.delayed{background:var(--alert)} .mbar>i.robot{background:var(--robot)}
+  .btn{font-family:inherit;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;padding:11px 20px;background:var(--ink);color:var(--bg);border:1px solid var(--ink);border-radius:2px;cursor:pointer;font-weight:500;transition:opacity .15s}
+  .btn:hover{opacity:.85} .btn.ghost{background:transparent;color:var(--ink)} .btn.ghost:hover{background:var(--ink);color:var(--bg);opacity:1}
+  .btn.sm{padding:7px 13px;font-size:9.5px} .btn.robot{background:var(--robot);border-color:var(--robot)} .btn:disabled{opacity:.35;cursor:not-allowed}
+  .muted{color:var(--ink-soft);font-size:12px;line-height:1.6}
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+  .toolbar .spacer{flex:1}
+  .datebox{display:flex;align-items:center;gap:8px;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)}
+  input,select{font-family:inherit;font-size:12px;color:var(--ink);background:var(--bg);border:1px solid var(--ink-hairline);padding:8px 10px;border-radius:2px}
+  input:focus,select:focus{outline:none;border-color:var(--ink)}
+  .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:12px 24px;border-radius:3px;font-size:12px;opacity:0;pointer-events:none;transition:all .25s;z-index:100;max-width:520px}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .card{border:1px solid var(--ink-hairline);background:var(--paper);padding:18px 20px}
+  .card h3{font-size:14.5px;font-weight:600}
+  .card .meta{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);margin-top:4px}
+  .cstat{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid var(--ink-hairline)} .cstat:last-child{border-bottom:none}
+  .stars{color:var(--warn);letter-spacing:1px;font-size:12px}
+  .fbform[hidden]{display:none}
+  .fbform{margin-top:14px;border-top:1px solid var(--ink-hairline);padding-top:14px}
+  .stars-in{display:inline-flex;gap:3px;cursor:pointer;font-size:20px;color:var(--ink-hairline);user-select:none}
+  .stars-in span{transition:color .1s} .stars-in span.on{color:var(--warn)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+  .chip{font-size:9.5px;letter-spacing:.06em;padding:4px 9px;border:1px solid var(--ink-hairline);border-radius:20px;background:var(--bg);cursor:pointer;color:var(--ink-soft)}
+  .chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .fbitem{font-size:11px;padding:7px 0;border-bottom:1px solid var(--ink-hairline)} .fbitem:last-child{border:none}
+  .fbitem .st{color:var(--warn);font-size:10px;letter-spacing:1px} .fbitem .nt{color:var(--ink-soft);margin-top:2px;line-height:1.45}
+  .fblink{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);background:none;border:none;cursor:pointer;font-family:inherit;padding:0;margin-top:12px}
+  .fblink:hover{color:var(--ink)}
+  .mgmt-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:20px;align-items:start}
+  @media(max-width:900px){.mgmt-grid{grid-template-columns:1fr}}
+  .sitemap{border:1px solid var(--ink-hairline);border-radius:3px;background:var(--paper);overflow:hidden}
+  .sitemap svg{display:block;width:100%;height:auto}
+  .mkr{cursor:pointer}
+  .mkr text{font-family:'Space Grotesk',sans-serif;font-weight:600;fill:#fff;pointer-events:none}
+  .mkr .ring{fill:none;stroke:var(--ink);stroke-width:2;opacity:0}
+  .mkr.sel .ring{opacity:1}
+  .maplegend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:10.5px;color:var(--ink-soft);margin-top:10px}
+  .maplegend i{display:inline-block;width:11px;height:11px;vertical-align:middle;margin-right:6px}
+  .maplegend i.dot{border-radius:50%} .maplegend i.sq{border-radius:2px}
+  .mgmt-detail-h{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border-bottom:1px solid var(--ink-hairline);padding-bottom:14px;margin-bottom:14px}
+  .mgmt-detail-h h3{font-size:16px;font-weight:600}
+  .mgmt-detail-h .z{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);margin-top:4px}
+  .srep{border:1px solid var(--ink-hairline);border-radius:3px;padding:11px 13px;margin-bottom:8px;background:var(--bg)}
+  .srep .st{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+  .srep .rt{font-size:12.5px;font-weight:600;margin:3px 0 4px} .srep .rs{font-size:11.5px;color:var(--ink-soft);line-height:1.5}
+  .clar{border:1px solid var(--ink-hairline);border-radius:3px;background:rgba(0,9,25,0.03);padding:14px 16px;margin-top:6px}
+  .clar textarea{width:100%;min-height:70px;font-family:inherit;font-size:12.5px;color:var(--ink);background:var(--bg);border:1px solid var(--ink-hairline);padding:10px;border-radius:2px;resize:vertical;line-height:1.5}
+  .clar textarea:focus{outline:none;border-color:var(--ink)}
+  .clar .row{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  .clar label{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)}
+  .claritem{font-size:11.5px;padding:9px 0;border-bottom:1px solid var(--ink-hairline)} .claritem:last-child{border:none}
+  .claritem .due{color:var(--warn);font-weight:600}
+  /* Gantt */
+  .legend{display:flex;gap:16px;font-size:10px;letter-spacing:.04em;color:var(--ink-soft);flex-wrap:wrap;margin:12px 0}
+  .legend i{display:inline-block;width:20px;height:9px;vertical-align:middle;margin-right:6px;border-radius:1px}
+  .legend i.pl{background:var(--plan);border:1px solid var(--plan-line);height:8px} .legend i.ac{background:var(--ink)} .legend i.rb{background:var(--robot)}
+  .legend i.fc{background:repeating-linear-gradient(45deg,var(--ink),var(--ink) 3px,transparent 3px,transparent 6px);border:1px solid var(--ink)}
+  .legend i.dn{background:var(--good)} .legend i.dl{background:var(--alert)}
+  .gantt{border:1px solid var(--ink-hairline);background:var(--paper);overflow-x:auto}
+  .gantt-inner{min-width:820px}
+  .grow{display:grid;grid-template-columns:260px 1fr;border-top:1px solid var(--ink-hairline)} .grow:first-child{border-top:none}
+  .grow.months{position:sticky;top:0;background:var(--paper);z-index:5}
+  .glabel{padding:10px 13px;border-right:1px solid var(--ink-hairline)}
+  .glabel .t{font-size:12px;font-weight:500} .glabel .c{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-top:3px;display:flex;align-items:center;gap:6px}
+  .gtrack{position:relative;height:44px} .months .gtrack{height:28px;display:flex}
+  .mcol{flex:none;border-right:1px solid var(--ink-hairline);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);padding:8px 0 0 6px;overflow:hidden;white-space:nowrap}
+  .mgrid{position:absolute;top:0;bottom:0;border-right:1px solid var(--ink-hairline)}
+  .bar{position:absolute;border-radius:2px}
+  .bar.plan{background:var(--plan);border:1px solid var(--plan-line);height:9px;top:8px}
+  .bar.act{height:13px;top:20px;background:var(--ink)} .bar.act.robot{background:var(--robot)} .bar.act.done{background:var(--good)} .bar.act.delayed{background:var(--alert)}
+  .bar.act.forecast{background:repeating-linear-gradient(45deg,currentColor,currentColor 3px,transparent 3px,transparent 6px);border:1px solid}
+  .bar .lab{position:absolute;left:calc(100% + 6px);top:50%;transform:translateY(-50%);font-size:9px;white-space:nowrap;color:var(--ink-soft)}
+  .today{position:absolute;top:0;bottom:0;border-left:1.5px dashed var(--alert);z-index:6}
+  .today .tlab{position:absolute;top:2px;left:4px;font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--alert);white-space:nowrap}
+  .mdiamond{position:absolute;top:14px;width:11px;height:11px;background:var(--ink);transform:translateX(-50%) rotate(45deg);z-index:4}
+  .mdiamond.done{background:var(--good)} .mdiamond.delayed{background:var(--alert)} .mdiamond.plan-ghost{background:transparent;border:1.5px solid var(--plan-line)}
+  .scurve{width:100%;height:auto}
+  .hint{background:rgba(0,9,25,.03);border:1px solid var(--ink-hairline);border-left:2px solid var(--ink);padding:14px 16px;font-size:12px;line-height:1.6;color:var(--ink-soft);border-radius:2px}
+  .hint code,code.k{background:rgba(0,9,25,.06);padding:1px 5px;border-radius:3px;font-size:11.5px;color:var(--ink);font-family:'Courier New',monospace}
+  /* proposal */
+  .prop{border:1px solid var(--ink-hairline);border-radius:3px;padding:16px 18px;background:var(--bg)}
+  .prop.rec{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+  .prop.awarded{border-color:var(--good);box-shadow:0 0 0 1px var(--good)}
+  .prop .score{font-size:26px;font-weight:300} .prop .score small{font-size:12px;color:var(--ink-soft)}
+  .scbar{height:5px;background:var(--ink-hairline);border-radius:3px;overflow:hidden;margin:3px 0 0}
+  .scbar>i{display:block;height:100%;background:var(--ink)} .scbar>i.robot{background:var(--robot)}
+  .propgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px} @media(max-width:900px){.propgrid{grid-template-columns:1fr}}
+  .kv{display:flex;justify-content:space-between;font-size:11.5px;padding:4px 0;border-bottom:1px solid var(--ink-hairline)} .kv:last-child{border-bottom:none} .kv b{font-variant-numeric:tabular-nums}
+  .ribbon{display:inline-block;font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--ink);color:var(--bg)}
+  .ribbon.rec{background:var(--ink)} .ribbon.awarded{background:var(--good)}
+  /* directive feed */
+  .dir{border:1px solid var(--ink-hairline);border-radius:3px;padding:15px 17px;background:var(--paper);margin-bottom:12px}
+  .dir .dh{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .dir .dh .title{font-size:13.5px;font-weight:600}
+  .dir .trigger{font-size:10.5px;color:var(--alert);margin-top:8px;letter-spacing:.02em}
+  .dir .detail{font-size:12px;color:var(--ink-soft);margin-top:8px;line-height:1.55}
+  .dir .route{font-size:10px;letter-spacing:.06em;color:var(--ink-soft);margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .dir .actions{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .dstatus{font-size:9px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;padding:3px 9px;border-radius:20px;border:1px solid}
+  .dstatus.Draft{color:var(--ink-soft);border-color:var(--ink-hairline)}
+  .dstatus.Issued{color:var(--ink);border-color:var(--ink-faint)}
+  .dstatus.Acknowledged{color:var(--warn);border-color:var(--warn)}
+  .dstatus.Executing{color:var(--robot);border-color:var(--robot)}
+  .dstatus.Completed{color:var(--good);border-color:var(--good)}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+  .dot.g{background:var(--good)} .dot.a{background:var(--warn)} .dot.r{background:var(--alert)} .dot.b{background:var(--robot)}
+  .feed{font-size:11.5px}
+  .feed .ln{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--ink-hairline)} .feed .ln:last-child{border:none}
+  .feed .ts{color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap;font-size:10.5px}
+  .intcard{border:1px solid var(--ink-hairline);background:var(--paper);padding:16px 18px;border-radius:3px}
+  .intcard h3{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .intcard .v{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);margin-top:3px}
+  pre.code{background:#000919;color:#e6e2e2;padding:16px 18px;border-radius:4px;overflow-x:auto;font-family:'Courier New',monospace;font-size:11.5px;line-height:1.6}
+  pre.code .c1{color:#8fb8d6} pre.code .c2{color:#c9a5f2} pre.code .c3{color:#89d4a0}
+</style>
+<link rel="stylesheet" href="worksite.css?v=whatsapp-schedule-channel">
+<script src="worksite-3d.js?v=high-clearance-pipe-racks"></script>
+<script src="worksite.js?v=site-clock"></script>
+</head>
+<body class="owner-app">
+<div class="demo-strip"><span>DEMO WORKSPACE · Illustrative project data</span></div>
+  <div class="topbar">
+    <div class="logo">Bohio</div>
+    <button id="menuToggle" class="menu-toggle" aria-label="Close menu" aria-expanded="true" aria-controls="projectTabs">☰</button>
+    <div class="pj"></div>
+  </div>
+  <div class="wrap">
+    <div class="tabs" id="projectTabs">
+      <button class="tab active" data-view="contractors">Project Overview</button>
+      <button class="tab" data-view="schedule">Schedule</button>
+      <button class="tab" data-view="orchestration">Orchestration Agent</button>
+      <a class="tab portal-tab" id="ownerPortalLink" href="contractor-portal.html?contractor=voltaic#inbox" target="_blank" rel="noopener">Contractor Portal <span aria-hidden="true">↗</span></a>
+    </div>
+
+    <!-- CONTRACTORS -->
+    <section class="view active" id="view-contractors">
+      <div class="toolbar">
+        <div class="datebox">Data date <input type="date" id="dataDate"></div>
+        <button class="btn ghost sm" id="btnToday" type="button">Today</button>
+        <div class="spacer"></div>
+        
+      </div>
+      <div id="projectDelaySummary"></div>
+      <div class="site-heading"><div><h1>3D worksite overview</h1></div><div class="site-date">DEMO POSITIONS<b id="mapDate"></b></div></div>
+      <div class="mgmt-grid">
+        <div>
+          <div class="sitemap" id="siteMap"></div>
+          <div class="maplegend">
+            <span><i class="dot" style="background:var(--ink)"></i>Human</span>
+            <span><i class="sq" style="background:var(--robot)"></i>Robot</span>
+            <span><i class="dot" style="background:var(--alert)"></i>Delayed</span>
+            <span class="muted">Click a contractor to see detail</span>
+          </div>
+        </div>
+        <div id="mgmtDetail"></div>
+      </div>
+      <h2 class="section merged-list-heading">Contractor directory</h2>
+      <div class="grid3" id="roster"></div>
+    </section>
+
+    <section class="view schedule-view" id="view-schedule">
+      <header class="schedule-hero">
+        <div><span>PRIMAVERA P6 · SCHEDULE OF RECORD</span><h1>Project schedule</h1><p>WhatsApp messages, voice notes and photographs are matched to activities and measurable deliverables. Evidence remains attached to the relevant step through verification and Primavera sync.</p></div>
+        <div class="schedule-sync"><i></i><strong>Live connection</strong><small id="scheduleSyncTime">Awaiting refresh</small></div>
+      </header>
+      <div class="schedule-kpis" id="scheduleKpis"></div>
+      <div class="schedule-toolbar">
+        <label class="schedule-search">Search schedule<input id="scheduleSearch" placeholder="Activity, contractor or deliverable"></label>
+        <label>Status<select id="scheduleStatus"><option value="all">All statuses</option><option value="delayed">Delayed</option><option value="atrisk">At risk</option><option value="ontrack">On track</option><option value="done">Complete</option><option value="tender">Unassigned</option></select></label>
+        <div class="schedule-legend"><span><i class="complete"></i>Verified</span><span><i class="pending"></i>Awaiting review</span><span><i class="empty"></i>Not submitted</span></div>
+      </div>
+      <div class="schedule-board">
+        <div class="schedule-board-head"><span>Activity and deliverables</span><span>Planned duration</span><span>Schedule position</span></div>
+        <div id="scheduleRows"></div>
+      </div>
+    </section>
+
+    <section class="view orchestration-view" id="view-orchestration">
+      <h1 class="orchestration-page-title">Orchestration Agent</h1>
+      <div class="orchestration-subnav" role="tablist" aria-label="Orchestration agent sections">
+        <button class="active" type="button" role="tab" aria-selected="true" data-orchestration-panel="instructions">Agent instructions</button>
+        <button type="button" role="tab" aria-selected="false" data-orchestration-panel="inputs">Project inputs <span id="orchestrationTabCount"></span></button>
+      </div>
+      <div class="orchestration-tab-panel active" id="orchestration-panel-instructions" role="tabpanel">
+        <div class="orchestration-monitor" aria-live="polite">
+          <div><strong>Continuous monitoring</strong><span id="orchestrationMonitorScope">Contractor portal, Primavera P6, drawings and site reports</span></div>
+          <span id="orchestrationMonitorStatus">Analysing current inputs…</span>
+        </div>
+        <div class="orchestration-title orchestration-insight-title"><h2>Generated insights</h2><span>Compared with illustrative client project history</span></div>
+        <div class="orchestration-insights" id="orchestrationInsights"></div>
+        <div class="orchestration-title"><h2>Recommended instructions</h2></div>
+        <div class="recommendation-list" id="orchestrationRecommendations"></div>
+      </div>
+      <div class="orchestration-tab-panel" id="orchestration-panel-inputs" role="tabpanel" hidden>
+        <section class="whatsapp-channel-card">
+          <div class="whatsapp-channel-icon" aria-hidden="true">◉</div>
+          <div><span>PLANNER / PROJECT MANAGER WHATSAPP · PHONE WEBHOOK ACTIVE</span><h2>Chat-to-deliverable channel</h2><p>The planner or project manager sends a message, photograph or voice note from site. Bohio identifies the affected contractor, matches the evidence to a measurable deliverable and holds progress at zero until the full target and acceptance evidence are verified.</p></div>
+          <label>Schedule target<select id="whatsappScheduleTarget" onchange="setWhatsAppScheduleTarget(this.value)"><option>Oracle Primavera P6</option><option>Microsoft Project</option></select></label>
+          <a class="btn sm whatsapp-demo-link" href="whatsapp-demo.html" target="_blank" rel="noopener">Test WhatsApp flow ↗</a>
+        </section>
+        <section class="whatsapp-progress-panel" aria-live="polite">
+          <div class="orchestration-title"><div><span>LIVE AUTOMATION TRAIL</span><h2>WhatsApp → deliverable verification → schedule</h2></div><span id="whatsappTimelineStatus">Waiting for a demo update</span></div>
+          <div id="whatsappProgressTimeline"></div>
+        </section>
+        <section class="contractor-report-intake">
+          <div class="report-intake-heading"><div><span>REPORT INTAKE</span><h2>Add project report</h2></div><small id="reportIntakeStatus">Ready for a PDF or scanner input</small></div>
+          <div class="report-intake-fields">
+            <label>Contractor<select id="reportContractor"><option value="delta">Delta Civil</option><option value="aqua">AquaFlow Infrastructure</option><option value="voltaic">Voltaic Power Systems</option><option value="meridian">Meridian Roads</option><option value="verdant">Verdant Landscapes</option><option value="robopave">RoboPave Autonomous Fleet</option><option value="gridbot">Gridline Robotics</option><option value="terra">Terra Survey Drones</option></select></label>
+            <label>Report title<input id="reportTitle" placeholder="e.g. Daily site report — Zone 4"></label>
+          </div>
+          <div class="report-intake-actions">
+            <label class="btn sm report-file-button" for="reportPdfFile">Upload PDF</label>
+            <input class="report-file-input" type="file" id="reportPdfFile" accept=".pdf,application/pdf" onchange="importContractorReport(this,'upload')">
+            <label class="btn ghost sm report-file-button" for="reportScannerFile">Connect scanner / scan</label>
+            <input class="report-file-input" type="file" id="reportScannerFile" accept=".pdf,application/pdf,image/*" capture="environment" onchange="importContractorReport(this,'scan')">
+          </div>
+          <p class="report-intake-help">Choose a PDF from a network scanner, or use the connected device’s camera or document source. The report is indexed immediately and added to the agent’s monitoring feed.</p>
+        </section>
+        <aside class="orchestration-inputs">
+          <div class="orchestration-title"><h2>Project inputs</h2><span id="orchestrationInputCount"></span></div>
+          <div id="orchestrationInputs"></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- SETTINGS · INTEGRATIONS -->
+    <section class="view" id="view-integrations">
+      <div style="display:flex;align-items:baseline;gap:12px;margin-top:6px;">
+        <div style="font-size:20px;font-weight:600;letter-spacing:.02em;">Settings</div>
+        <div class="muted" style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;">Integrations &amp; connected systems</div>
+      </div>
+      <h2 class="section">AI agent — Anthropic API</h2>
+      <div class="grid2" style="align-items:start;">
+        <div class="panel">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+            <span class="dot" id="anthDot" style="background:var(--ink-hairline)"></span>
+            <b id="anthStatus" style="font-size:12.5px;">Not configured</b>
+          </div>
+          <label class="fl" style="display:block;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px;">Anthropic API key</label>
+          <input type="password" id="anthKey" placeholder="sk-ant-..." autocomplete="off" style="width:100%;margin-bottom:14px;">
+          <label class="fl" style="display:block;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px;">Model</label>
+          <select id="anthModel" style="width:100%;margin-bottom:16px;">
+            <option value="claude-opus-5">Claude Opus 5 — most capable</option>
+            <option value="claude-sonnet-5">Claude Sonnet 5 — balanced</option>
+            <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 — fast</option>
+            <option value="claude-fable-5-1">Claude Fable 5.1</option>
+          </select>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn sm" id="anthSave">Save</button>
+            <button class="btn ghost sm" id="anthClear">Remove</button>
+          </div>
+        </div>
+        <div class="hint">
+          <strong style="color:var(--ink);letter-spacing:.03em;">Powering the agent with Claude.</strong><br>
+          This is a simulated integration. Recommendations use local demo rules; no AI model or external system is called. The model selection is illustrative. It is stored only in this browser (localStorage) and is never sent anywhere from this demo.<br><br>
+          <span style="color:var(--warn);">In production the key must live server-side</span> — the browser calls your backend, which holds the Anthropic key and proxies the request. Never ship an API key in client-side code.
+        </div>
+      </div>
+      <h2 class="section">Connected systems — MCP</h2>
+      <p class="muted" style="margin:-6px 0 16px;">The platform speaks to the tools heavy-industry programmes already run on, through Model Context Protocol servers. Primavera P6 is the schedule of record; verified deliverables flow in, and directives and approved re-baselines flow back out.</p>
+      <div class="grid3" id="integrations"></div>
+      <h2 class="section">Monday.com project board</h2>
+      <div class="panel monday-connection">
+        <div><span class="dot" id="mondayDot"></span><div><b id="mondayStatus">Checking connection…</b><p>Verified deliverables and planner-approved schedule changes are mirrored to the project board. WhatsApp evidence stays linked to the relevant activity.</p></div></div>
+        <div><button class="btn sm" id="mondayTest" type="button">Test connection</button><a class="btn ghost sm" id="mondayBoardLink" href="https://monday.com" target="_blank" rel="noopener">Open Monday.com ↗</a></div>
+      </div>
+      <h2 class="section">MCP sync activity</h2>
+      <div class="panel feed" id="intFeed"></div>
+      <h2 class="section">Primavera P6 MCP server — connection</h2>
+      <div class="grid2" style="align-items:start;">
+        <div>
+          <p class="muted" style="margin-bottom:10px;">All six connectors above ship as runnable MCP servers in <code class="k">mcp/</code> (register them from <code class="k">mcp-config.example.json</code>). Primavera P6 is the schedule of record — it exposes tools that let the agent read activities, post verified deliverable gates, and issue directives.</p>
+          <pre class="code" id="mcpConfig"></pre>
+        </div>
+        <div>
+          <p class="muted" style="margin-bottom:10px;">Tools exposed by <code class="k">primavera-p6</code>:</p>
+          <div class="tbl-wrap"><table id="mcpTools"></table></div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <button class="project-agent-toggle" id="projectAgentToggle" aria-label="Open project agent" aria-expanded="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15a4 4 0 0 1-4 4H9l-5 3v-7a4 4 0 0 1-1-2.6V7a4 4 0 0 1 4-4h9a4 4 0 0 1 4 4z"/><path d="M8 9h8M8 13h5"/></svg>
+  </button>
+  <aside class="project-agent" id="projectAgent" hidden aria-label="Bohio project agent">
+    <div class="agent-head"><div><b>Bohio project agent</b><span>Live demo project data</span></div><button id="projectAgentClose" aria-label="Close project agent">×</button></div>
+    <details class="agent-api" id="agentApiPanel">
+      <summary>Connect AI API <span id="agentApiStatus">Not connected</span></summary>
+      <div class="agent-api-fields">
+        <label>Provider<select id="agentApiProvider"><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option></select></label>
+        <label>Model<input id="agentApiModel" value="gpt-5-mini" autocomplete="off"></label>
+        <label>API key<input id="agentApiKey" type="password" placeholder="Paste API key" autocomplete="off"></label>
+        <button class="btn sm" id="agentApiSave" type="button">Save API</button>
+        <small>Saved only in this browser for the demo.</small>
+      </div>
+    </details>
+    <div class="agent-messages" id="agentMessages" aria-live="polite"><div class="agent-message bot">Ask about project delay, verified deliverables, drawings, or instructions. I can also take you to a contractor, the map, settings, or the contractor portal.</div></div>
+    <form class="agent-form" id="agentForm"><textarea id="agentInput" rows="2" aria-label="Ask the project agent" placeholder="Ask about this project…" autocomplete="off"></textarea><button aria-label="Send question">↑</button></form>
+  </aside>
+  <dialog class="report-preview" id="reportPreviewDialog" aria-labelledby="reportPreviewTitle">
+    <div class="report-preview-shell">
+      <header>
+        <div><span>REPORT PREVIEW</span><h2 id="reportPreviewTitle">Contractor report</h2></div>
+        <button type="button" id="reportPreviewClose" aria-label="Close report preview">×</button>
+      </header>
+      <iframe id="reportPreviewFrame" title="PDF report preview"></iframe>
+      <p>If the preview is unavailable, check that your browser allows PDF viewing.</p>
+    </div>
+  </dialog>
+  <div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   Bohio · Contractor Platform (self-contained demo)
+   Human & robot contractors interchangeable · proposal selection
+   · predictive delay detection · agentic directives · MCP.
+   ============================================================ */
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const STORE='bohio_contractor_platform_v1', SCHEDULE_CHANGE_KEY='bohio_schedule_change_requests_v1', WHATSAPP_UPDATES_KEY='bohio_whatsapp_updates_v1', MS=86400000;
+const D=s=>{if(s instanceof Date)return s;const[y,m,d]=s.split('-').map(Number);return new Date(Date.UTC(y,m-1,d));};
+const iso=d=>d.toISOString().slice(0,10);
+const days=(a,b)=>Math.round((D(b)-D(a))/MS);
+const addD=(d,n)=>new Date(D(d).getTime()+n*MS);
+const fmt=s=>{if(!s)return'—';const d=D(s);return String(d.getUTCDate()).padStart(2,'0')+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()]+' '+d.getUTCFullYear();};
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const money=n=>'$'+(n>=1?n.toFixed(2)+'M':(n*1000).toFixed(0)+'k');
+const stars=r=>{const f=Math.round(r);return '★'.repeat(f)+'☆'.repeat(5-f);};
+
+/* ---------------- seed ---------------- */
+function seedSubmissions(){return[
+  {id:'sub-vol-recovery',contractor:'voltaic',title:'Electrical recovery programme',due:'2026-08-27',submittedAt:'',status:'Required'},
+  {id:'sub-vol-lookahead',contractor:'voltaic',title:'Three-week look-ahead',due:'2026-08-28',submittedAt:'',status:'Required'},
+  {id:'sub-mer-survey',contractor:'meridian',title:'South-loop level survey',due:'2026-08-26',submittedAt:'',status:'Required'},
+  {id:'sub-delta-closeout',contractor:'delta',title:'Earthworks close-out pack',due:'2026-04-25',submittedAt:'2026-04-22',status:'Accepted'},
+  {id:'sub-aqua-asbuilt',contractor:'aqua',title:'Drainage as-built package',due:'2026-06-18',submittedAt:'2026-06-12',status:'Accepted'},
+  {id:'sub-verdant-method',contractor:'verdant',title:'Mobilisation method statement',due:'2026-09-30',submittedAt:'',status:'Required'}
+];}
+const DELIVERABLE_BLUEPRINTS={
+  mob:[
+    ['01','Survey control established','6 benchmarks',6,'benchmarks','Signed survey-control sheet','2026-01-08'],
+    ['02','Site boundary secured','2.4 km',2.4,'km','Inspection record and geotagged perimeter photos','2026-01-12'],
+    ['03','Temporary access commissioned','1 access route',1,'route','Load test and access permit','2026-01-18'],
+    ['04','Welfare and emergency facilities operational','1 compound',1,'compound','HSE readiness inspection','2026-01-24'],
+    ['05','Mobilisation handover accepted','1 handover pack',1,'pack','Owner acceptance signature','2026-02-02']],
+  earth:[
+    ['01','Topsoil stripped and stockpiled','48,000 m²',48000,'m²','Drone surface and stockpile survey','2026-02-20'],
+    ['02','North basin cut complete','82,000 m³',82000,'m³','Approved cut-volume survey','2026-03-12'],
+    ['03','Central platform filled','96,000 m³',96000,'m³','Compaction tests and level survey','2026-03-31'],
+    ['04','South corridor formation complete','31,000 m²',31000,'m²','Formation level and proof-roll record','2026-04-12'],
+    ['05','Earthworks close-out accepted','1 as-built package',1,'pack','As-built model and engineer acceptance','2026-04-22']],
+  drain:[
+    ['01','Primary storm line installed','1,240 m',1240,'m','Surveyed invert levels and inspection photos','2026-03-30'],
+    ['02','Secondary storm branches installed','860 m',860,'m','Surveyed invert levels and joint records','2026-04-15'],
+    ['03','Catchpits and manholes complete','34 units',34,'units','Inspection checklist for every structure','2026-04-30'],
+    ['04','Outfall and headwall commissioned','2 outfalls',2,'outfalls','Structural inspection and flow test','2026-05-25'],
+    ['05','Drainage network accepted','1 network',1,'network','CCTV survey and signed handover','2026-06-12']],
+  water:[
+    ['01','Potable-water main installed','1,480 m',1480,'m','Weld/joint log and surveyed alignment','2026-04-30'],
+    ['02','Sewer pressure main installed','960 m',960,'m','Joint log and surveyed alignment','2026-05-20'],
+    ['03','Valve chambers complete','18 units',18,'units','Chamber inspection records','2026-06-10'],
+    ['04','Pressure and leakage tests passed','6 test sections',6,'sections','Signed test certificates','2026-06-30'],
+    ['05','Water and sewer system accepted','1 handover pack',1,'pack','As-builts and authority acceptance','2026-07-20']],
+  duct:[
+    ['01','Ductbank trench and formation — Grids A–C','640 m',640,'m','Surveyed formation and trench inspection','2026-06-10'],
+    ['02','Ductbank installed — Grids A–C','640 m',640,'m','Mandrel test and concrete pour records','2026-07-05'],
+    ['03','Pull pits and manholes complete','18 units',18,'units','Inspection checklist for all structures','2026-08-15'],
+    ['04','Ductbank installed — Grids D–E','820 m',820,'m','Mandrel test, pour records and as-built survey',null],
+    ['05','Substation energized and accepted','1 substation',1,'substation','Protection test pack and energization certificate',null]],
+  tele:[
+    ['01','Telecom chambers complete','14 units',14,'units','Chamber inspection records','2026-06-30'],
+    ['02','Fibre ducts proven','1,120 m',1120,'m','Mandrel and draw-rope test sheets','2026-07-10'],
+    ['03','Backbone fibre pulled','24 cores',24,'cores','Cable drum and pulling records','2026-08-10'],
+    ['04','Fibre tested end-to-end','24 cores',24,'cores','OTDR results for every core','2026-08-25'],
+    ['05','Telecom network handed over','1 system',1,'system','Approved test dossier and as-builts',null]],
+  sub:[
+    ['01','South-loop formation accepted','18,500 m²',18500,'m²','Proof-roll and level survey','2026-07-05'],
+    ['02','Geotextile and capping complete','18,500 m²',18500,'m²','Lot inspection and material records','2026-07-25'],
+    ['03','Sub-base compacted and accepted','12,800 m²',12800,'m²','Density tests and level survey','2026-08-20'],
+    ['04','Kerbs installed and accepted','3,600 m',3600,'m','Line/level survey and inspection',null],
+    ['05','Road-base handover complete','1 handover area',1,'area','Joint inspection and signed release',null]],
+  asph:[
+    ['01','Asphalt mix design approved','1 mix design',1,'design','Laboratory approval and trial panel',null],
+    ['02','Binder course — north spine accepted','9,600 m²',9600,'m²','Core density and level survey',null],
+    ['03','Binder course — south loop accepted','8,900 m²',8900,'m²','Core density and level survey',null],
+    ['04','Wearing course complete','18,500 m²',18500,'m²','Thickness, density and ride-quality tests',null],
+    ['05','Road markings and opening certificate','1 road network',1,'network','Safety inspection and opening certificate',null]],
+  light:[
+    ['01','Lighting foundations accepted','64 units',64,'units','Foundation inspection records',null],
+    ['02','Poles installed and aligned','64 units',64,'units','Surveyed alignment and torque records',null],
+    ['03','Luminaries and feeder cabling complete','64 units',64,'units','Cable test and installation records',null],
+    ['04','ITS field devices commissioned','18 devices',18,'devices','Functional test sheets',null],
+    ['05','Lighting and ITS system accepted','1 system',1,'system','Night test and handover certificate',null]],
+  land:[
+    ['01','Topsoil placement accepted','22,000 m²',22000,'m²','Depth checks and survey',null],
+    ['02','Irrigation network commissioned','1 system',1,'system','Pressure test and zone demonstration',null],
+    ['03','Trees and shrubs planted','1,480 units',1480,'units','Geotagged planting register',null],
+    ['04','Hard landscape complete','6,400 m²',6400,'m²','Finish inspection and snag close-out',null],
+    ['05','Landscape establishment accepted','1 handover area',1,'area','30-day establishment inspection',null]]
+};
+function seedDeliverables(){return Object.entries(DELIVERABLE_BLUEPRINTS).flatMap(([taskId,rows])=>rows.map((r,index)=>({id:`${taskId}-${r[0]}`,taskId,name:r[1],measure:r[2],target:r[3],unit:r[4],acceptance:r[5],weight:20,status:r[6]?'Verified':'Not submitted',verifiedDate:r[6]||'',evidence:r[6]?r[5]:'' ,sequence:index+1})));}
+function seed(){
+  const project={name:'Marina District — Access & Utilities Infrastructure',client:'Bohio Development Partners',dataDate:'2026-08-28'};
+  const contractors=[
+    {id:'delta',   name:'Delta Civil',                kind:'Human', discipline:'Earthworks & enabling', rating:4.4, autonomy:'—',            rate:'crew / day', status:'On site'},
+    {id:'aqua',    name:'AquaFlow Infrastructure',    kind:'Human', discipline:'Wet utilities',         rating:4.6, autonomy:'—',            rate:'crew / day', status:'Complete'},
+    {id:'voltaic', name:'Voltaic Power Systems',      kind:'Human', discipline:'Electrical & telecom',  rating:4.1, autonomy:'—',            rate:'crew / day', status:'On site'},
+    {id:'meridian',name:'Meridian Roads',             kind:'Human', discipline:'Roads & paving',        rating:4.3, autonomy:'—',            rate:'crew / day', status:'On site'},
+    {id:'verdant', name:'Verdant Landscapes',         kind:'Human', discipline:'Landscaping',           rating:4.2, autonomy:'—',            rate:'crew / day', status:'Standby'},
+    {id:'robopave',name:'RoboPave Autonomous Fleet',  kind:'Robot', discipline:'Autonomous paving',     rating:4.8, autonomy:'L4 · supervised', rate:'3 units · 20h/day', status:'Available'},
+    {id:'gridbot', name:'Gridline Robotics',          kind:'Robot', discipline:'Robotic electrical install', rating:4.5, autonomy:'L3',       rate:'2 units', status:'Available'},
+    {id:'terra',   name:'Terra Survey Drones',        kind:'Robot', discipline:'Survey & QA',           rating:4.7, autonomy:'L4',           rate:'drone swarm', status:'On site'},
+  ];
+  // work packages. contractor=null => open tender
+  const tasks=[
+    {id:'mob',  name:'Mobilization & Site Setup',        contractor:'delta',   ps:'2026-01-06',pe:'2026-01-30',w:4, dep:null},
+    {id:'earth',name:'Earthworks & Bulk Excavation',     contractor:'delta',   ps:'2026-02-02',pe:'2026-04-10',w:12,dep:'mob'},
+    {id:'drain',name:'Stormwater & Drainage Network',    contractor:'aqua',    ps:'2026-03-16',pe:'2026-05-29',w:12,dep:'earth'},
+    {id:'water',name:'Sewerage & Water Mains',           contractor:'aqua',    ps:'2026-04-13',pe:'2026-06-26',w:12,dep:'earth'},
+    {id:'duct', name:'Electrical Ductbank & Substation', contractor:'voltaic', ps:'2026-05-04',pe:'2026-07-31',w:14,dep:'earth'},
+    {id:'tele', name:'Telecoms & Fibre Ducting',         contractor:'voltaic', ps:'2026-06-01',pe:'2026-07-24',w:6, dep:'duct'},
+    {id:'sub',  name:'Road Sub-base & Kerbing',          contractor:'meridian',ps:'2026-06-15',pe:'2026-08-21',w:10,dep:'drain'},
+    {id:'asph', name:'Asphalt & Surfacing',              contractor:null,      ps:'2026-08-24',pe:'2026-10-16',w:12,dep:'sub'},
+    {id:'light',name:'Street Lighting & ITS',            contractor:null,      ps:'2026-09-07',pe:'2026-10-30',w:6, dep:'sub'},
+    {id:'land', name:'Landscaping & Handover',           contractor:'verdant', ps:'2026-10-19',pe:'2026-12-11',w:12,dep:'asph'},
+  ];
+  const milestones=[
+    {id:'m1',name:'Site Possession',plan:'2026-01-06',gov:'mob',govEnd:false},
+    {id:'m2',name:'Drainage Network Complete',plan:'2026-05-29',gov:'drain',govEnd:true},
+    {id:'m3',name:'Utilities Energized',plan:'2026-07-31',gov:'duct',govEnd:true},
+    {id:'m4',name:'Road Open to Traffic',plan:'2026-10-16',gov:'asph',govEnd:true},
+    {id:'m5',name:'Practical Completion & Handover',plan:'2026-12-11',gov:'land',govEnd:true},
+  ];
+  // progress reports (per contractor snapshots) — reconstruct actuals
+  const snaps=['2026-02-28','2026-03-31','2026-04-30','2026-05-31','2026-06-30','2026-07-31','2026-08-28'];
+  const sched={
+    mob:  {p:[100,100,100,100,100,100,100],s:'2026-01-08',f:'2026-02-02'},
+    earth:{p:[ 20, 55, 95,100,100,100,100],s:'2026-02-05',f:'2026-04-22'},
+    drain:{p:[  0, 10, 45, 88,100,100,100],s:'2026-03-20',f:'2026-06-12'},
+    water:{p:[  0,  0, 15, 50, 82,100,100],s:'2026-04-20',f:'2026-07-20'},
+    duct: {p:[  0,  0,  0, 18, 38, 55, 68],s:'2026-05-18',f:null},
+    tele: {p:[  0,  0,  0,  0, 25, 55, 80],s:'2026-06-10',f:null},
+    sub:  {p:[  0,  0,  0,  0, 10, 45, 72],s:'2026-06-22',f:null},
+  };
+  const cOf={mob:'delta',earth:'delta',drain:'aqua',water:'aqua',duct:'voltaic',tele:'voltaic',sub:'meridian'};
+  const reports=[]; let rid=1;
+  snaps.forEach((date,i)=>{
+    const byC={};
+    Object.keys(sched).forEach(id=>{const c=cOf[id];const sc=sched[id];if(sc.p[i]>0||(i>0&&sc.p[i-1]>0)){(byC[c]=byC[c]||[]).push({taskId:id,percent:sc.p[i],actualStart:(sc.s&&sc.p[i]>0)?sc.s:null,actualFinish:(sc.f&&sc.p[i]>=100)?sc.f:null});}});
+    Object.keys(byC).forEach(c=>reports.push({id:'r'+(rid++),contractor:c,date,lines:byC[c]}));
+  });
+  // tenders
+  const tenders=[
+    {taskId:'asph', proposals:[
+      {contractor:'meridian',price:2.40,durationDays:53,availableFrom:'2026-09-21',riskPct:22,note:'Incumbent crew, familiar with site logistics.'},
+      {contractor:'robopave',price:2.05,durationDays:34,availableFrom:'2026-08-30',riskPct:9, note:'3 autonomous pavers, 20h/day, cm-level GNSS screed control.'},
+      {contractor:'meridian',price:2.62,durationDays:60,availableFrom:'2026-10-05',riskPct:31,note:'Alternate: second regional crew if primary unavailable.',alt:'Continental Surfacing (JV)'},
+    ], awardedTo:null},
+    {taskId:'light', proposals:[
+      {contractor:'gridbot', price:0.90,durationDays:28,availableFrom:'2026-09-05',riskPct:12,note:'Robotic pole-setting + auto-alignment, night operation.'},
+      {contractor:'voltaic', price:1.00,durationDays:40,availableFrom:'2026-09-10',riskPct:20,note:'Manual install by incumbent electrical crew.'},
+    ], awardedTo:null},
+  ];
+  const now=project.dataDate+'T09:12';
+  const directives=[
+    {id:'d1',ts:'2026-08-26T16:40',taskId:'duct',contractor:'voltaic',title:'Authorize second night-shift crew on ductbank',
+      detail:'Ductbank forecast breaches the Utilities Energized milestone by 11 weeks. Add a night crew and pull the substation termination forward to recover ~3 weeks.',
+      trigger:'Predicted: Electrical Ductbank & Substation +76d vs plan',status:'Acknowledged'},
+    {id:'d2',ts:'2026-08-27T07:05',taskId:'sub',contractor:'terra',title:'Dispatch daily autonomous progress survey — south loop',
+      detail:'Deploy Terra drone swarm for daily volumetric + level survey of the sub-base south loop to verify recovery against the re-sequenced plan.',
+      trigger:'At-risk: Road Sub-base & Kerbing behind planned earned progress',status:'Executing'},
+  ];
+  const integrations=[
+    {id:'p6', name:'Oracle Primavera P6 EPPM', role:'Schedule of record', kind:'MCP', status:'Connected', last:'2026-08-28T09:10', records:'1,284 activities', server:'primavera-p6'},
+    {id:'monday',name:'Monday.com',role:'Project board mirror',kind:'GraphQL API',status:'Ready to connect',last:'2026-08-28T09:10',records:'Verified gates only',server:'monday-api'},
+    {id:'synchro',name:'Bentley SYNCHRO 4D',   role:'4D BIM sequencing',  kind:'MCP', status:'Connected', last:'2026-08-28T08:40', records:'312 tasks linked', server:'synchro-4d'},
+    {id:'acc', name:'Autodesk Construction Cloud', role:'Field & QA / RFIs', kind:'MCP', status:'Connected', last:'2026-08-28T09:02', records:'96 open issues', server:'autodesk-acc'},
+    {id:'sap', name:'SAP S/4HANA EPC',         role:'Cost & procurement', kind:'MCP', status:'Connected', last:'2026-08-28T06:15', records:'PO ledger synced', server:'sap-s4-epc'},
+    {id:'procore',name:'Procore',              role:'Daily logs & RFIs',  kind:'MCP', status:'Connected', last:'2026-08-28T08:58', records:'Human directive channel', server:'procore'},
+    {id:'trimble',name:'Trimble WorksManager', role:'Robot fleet dispatch & telemetry', kind:'MCP', status:'Connected', last:'2026-08-28T09:11', records:'7 machines online', server:'trimble-works'},
+  ];
+  const intFeed=[
+    {ts:'09:11',t:'Trimble ▸ RoboPave fleet telemetry: 3 pavers idle, staged at south compound.'},
+    {ts:'09:10',t:'Primavera P6 ▸ pulled 1,284 activities; progress written back to 41 activities.'},
+    {ts:'09:02',t:'Autodesk ACC ▸ 2 new field observations tagged to Ductbank package.'},
+    {ts:'08:58',t:'Procore ▸ directive D-1 acknowledged by Voltaic site agent.'},
+    {ts:'08:40',t:'SYNCHRO 4D ▸ re-sequenced sub-base south loop; critical path recomputed.'},
+    {ts:'06:15',t:'SAP S/4HANA ▸ asphalt tender PO drafts synced to procurement.'},
+  ];
+  const feedback=[
+    {id:'f1',contractor:'robopave',rating:5,tags:['On time','Quality'],note:'Marina east trial — paved 18% ahead of plan with zero rework.',ts:'2026-07-30T14:00'},
+    {id:'f2',contractor:'aqua',    rating:5,tags:['On time'],          note:'Drainage handed over early; clean CCTV as-builts.',ts:'2026-06-14T10:00'},
+    {id:'f3',contractor:'meridian',rating:4,tags:['Quality'],          note:'Good finish on sub-base; minor kerb rework at south loop.',ts:'2026-08-10T09:00'},
+    {id:'f4',contractor:'voltaic', rating:3,tags:['Delay','Communication'],note:'Ductbank slipped on transformer logistics; slow to escalate.',ts:'2026-08-20T16:00'},
+    {id:'f5',contractor:'gridbot', rating:5,tags:['Quality','On time'],note:'Pole-setting trial — precise auto-alignment, night shift.',ts:'2026-08-05T22:00'},
+  ];
+  return {project,contractors,tasks,milestones,reports,tenders,directives,integrations,intFeed,feedback,clarifications:[],submissions:seedSubmissions(),p6Audit:[],whatsappUpdates:[],whatsappScheduleTarget:'Oracle Primavera P6',deliverables:seedDeliverables(),deliverableClaims:[],deliverableModelVersion:1};
+}
+// Worksite positions (viewBox 0..100 x 0..66) and zone labels.
+const LOC={
+  delta:   {x:28,y:34,zone:'Central earthworks plot'},
+  aqua:    {x:53,y:25,zone:'Drainage & water corridor'},
+  voltaic: {x:79,y:17,zone:'Substation & ductbank'},
+  meridian:{x:46,y:50,zone:'Road spine — south loop'},
+  verdant: {x:17,y:55,zone:'Landscaping perimeter'},
+  robopave:{x:70,y:56,zone:'Paving staging compound'},
+  gridbot: {x:82,y:43,zone:'Lighting corridor'},
+  terra:   {x:44,y:16,zone:'Aerial survey (roaming)'},
+};
+Object.entries(Worksite3D.features).forEach(([id,feature])=>{if(LOC[id])LOC[id].zone=feature.zone;});
+const SITE_REPORTS={
+  voltaic:[
+    {date:'2026-08-28',title:'Daily site report — Ductbank grid E',summary:'Night crew mobilized. 2 of 4 substation terminations complete; transformer staged for energization.'},
+    {date:'2026-08-21',title:'Weekly progress — Electrical',summary:'Ductbank 62% → 68%; fibre pulls at 80%. Awaiting relay panel delivery.'},
+    {date:'2026-08-14',title:'HSE inspection',summary:'Trench shoring re-checked after ACC observation ISS-104; closed out.'},
+  ],
+  meridian:[
+    {date:'2026-08-27',title:'Daily site report — Sub-base south loop',summary:'Trimming south loop; final level survey booked 20 Sep. 72% complete.'},
+    {date:'2026-08-20',title:'Weekly progress — Roads',summary:'Sub-base 45% → 72%; kerbing north spine started; asphalt plant secured.'},
+  ],
+  delta:[{date:'2026-04-22',title:'Earthworks close-out report',summary:'Cut/fill balanced and signed off; as-builts issued.'}],
+  aqua:[
+    {date:'2026-07-20',title:'Water mains pressure-test certificate',summary:'All sections passed; package closed.'},
+    {date:'2026-06-12',title:'Drainage CCTV survey',summary:'Network proven; as-builts submitted.'},
+  ],
+  verdant:[{date:'2026-08-25',title:'Mobilization readiness note',summary:'Crew and stock confirmed; awaiting road completion to mobilize.'}],
+  robopave:[{date:'2026-08-28',title:'Fleet telemetry — staging',summary:'3 autonomous pavers idle at south compound, calibrated, awaiting award.'}],
+  gridbot:[{date:'2026-08-26',title:'Trial pole-setting report',summary:'Auto-alignment within 3 mm; ready for lighting package.'}],
+  terra:[{date:'2026-08-28',title:'Drone survey — south loop',summary:'Daily volumetric survey uploaded; sub-base verified against plan.'}],
+};
+const SITE_REPORT_PAGES={voltaic:1,meridian:2,delta:3,aqua:4,verdant:5,robopave:6,gridbot:7,terra:8};
+const FB_TAGS=['On time','Quality','Safety','Communication','Cost overrun','Delay','Rework'];
+// Effective rating blends recorded feedback with the contractor's baseline
+// (baseline acts as a prior worth FB_PRIOR reviews). This drives procurement scoring.
+const FB_PRIOR=4;
+function ratingOf(id){
+  const base=(state.contractors.find(c=>c.id===id)||{}).rating||4;
+  const fb=(state.feedback||[]).filter(f=>f.contractor===id);
+  if(!fb.length)return base;
+  const sum=fb.reduce((s,f)=>s+f.rating,0);
+  return Math.round(((base*FB_PRIOR+sum)/(FB_PRIOR+fb.length))*10)/10;
+}
+
+let state=load()||seed();
+if(!state.integrations.some(x=>x.id==='monday'))state.integrations.splice(1,0,{id:'monday',name:'Monday.com',role:'Project board mirror',kind:'GraphQL API',status:'Ready to connect',last:state.project.dataDate+'T09:10',records:'Verified gates only',server:'monday-api'});
+function load(){try{const s=JSON.parse(localStorage.getItem(STORE)||'null');return s&&s.project&&Array.isArray(s.tasks)&&Array.isArray(s.contractors)&&Array.isArray(s.reports)&&Array.isArray(s.tenders)&&Array.isArray(s.directives)&&Array.isArray(s.milestones)&&Array.isArray(s.integrations)&&Array.isArray(s.intFeed)?{...s,feedback:s.feedback||[],clarifications:s.clarifications||[],submissions:Array.isArray(s.submissions)?s.submissions:seedSubmissions(),p6Audit:Array.isArray(s.p6Audit)?s.p6Audit:[],whatsappUpdates:Array.isArray(s.whatsappUpdates)?s.whatsappUpdates:[],whatsappScheduleTarget:s.whatsappScheduleTarget||'Oracle Primavera P6',deliverables:Array.isArray(s.deliverables)&&s.deliverables.length?s.deliverables:seedDeliverables(),deliverableClaims:Array.isArray(s.deliverableClaims)?s.deliverableClaims:[],deliverableModelVersion:1}:null;}catch(e){return null;}}
+function save(){try{localStorage.setItem(STORE,JSON.stringify(state));}catch(e){}}
+function taskDeliverables(taskId,date=state.project.dataDate){return (state.deliverables||[]).filter(x=>x.taskId===taskId).sort((a,b)=>a.sequence-b.sequence).map(x=>({...x,verified:x.status==='Verified'&&x.verifiedDate&&x.verifiedDate<=date}));}
+function deliverableSummary(taskId,date=state.project.dataDate){const items=taskDeliverables(taskId,date),verified=items.filter(x=>x.verified),earned=Math.round(verified.reduce((n,x)=>n+(x.weight||0),0));return {items,verified:verified.length,total:items.length,earned,pending:(state.deliverableClaims||[]).filter(x=>x.taskId===taskId&&x.status==='Pending verification').length};}
+const C=id=>state.contractors.find(c=>c.id===id)||{name:'—',kind:'Human'};
+function readScheduleChanges(){try{const value=JSON.parse(localStorage.getItem(SCHEDULE_CHANGE_KEY)||'[]');return Array.isArray(value)?value:[];}catch{return [];}}
+function writeScheduleChanges(items){try{localStorage.setItem(SCHEDULE_CHANGE_KEY,JSON.stringify(items));return true;}catch{return false;}}
+function lateSubmissions(id){return (state.submissions||[]).filter(x=>x.contractor===id&&!x.submittedAt&&x.due<state.project.dataDate);}
+function automatePrimavera(action,detail,evidence={}){
+  const target=state.whatsappScheduleTarget||'Oracle Primavera P6',syncId=(target.includes('Microsoft')?'MSP-AUTO-':'P6-AUTO-')+Date.now(),ts=state.project.dataDate+'T'+new Date().toTimeString().slice(0,5);
+  state.p6Audit=state.p6Audit||[];state.p6Audit.unshift({syncId,ts,action,detail,evidence,status:'Synced'});
+  const integration=state.integrations.find(x=>x.id==='p6');if(target.includes('Primavera')&&integration){integration.last=ts;integration.status='Connected';}
+  state.intFeed.unshift({ts:'now',t:`${target} ▸ automatic update · ${detail} · ${syncId}`});
+  syncMonday(action,detail,evidence);
+  return syncId;
+}
+async function syncMonday(action,detail,evidence={}){
+  const integration=state.integrations.find(x=>x.id==='monday'),task=state.tasks.find(x=>x.id===evidence.taskId);
+  if(!integration||!task)return;
+  try{
+    const evidenceUrl=evidence.mediaUrl?new URL(evidence.mediaUrl,location.origin).href:'';
+    const response=await fetch('/api/monday',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,taskId:task.id,taskName:task.name,detail,evidenceUrl,reporterRole:evidence.reporterRole||'Planner / Project Manager'})}),result=await response.json();
+    if(!response.ok)throw new Error(result.error||'Monday sync failed');
+    integration.status='Connected';integration.last=new Date().toISOString();integration.records=`Item ${result.itemId} updated`;state.intFeed.unshift({ts:'now',t:`Monday.com ▸ ${task.name} updated · item ${result.itemId}`});save();renderIntegrations();renderMondayStatus({configured:true,boardUrl:result.boardUrl,message:'Connected · latest verified change mirrored'});
+  }catch(error){integration.status='Needs configuration';save();renderIntegrations();renderMondayStatus({configured:false,message:error.message});}
+}
+window.setWhatsAppScheduleTarget=function(value){if(!['Oracle Primavera P6','Microsoft Project'].includes(value))return;state.whatsappScheduleTarget=value;save();renderAll();toast(`${value} selected for WhatsApp updates`);};
+const CONTRACTOR_EMAILS={
+  delta:'site@delta-civil.example',aqua:'projects@aquaflow.example',voltaic:'delivery@voltaic-power.example',meridian:'site@meridian-roads.example',
+  verdant:'works@verdant-landscapes.example',robopave:'operations@robopave.example',gridbot:'dispatch@gridline-robotics.example',terra:'survey@terra-drones.example'
+};
+const contractorEmail=id=>C(id).email||CONTRACTOR_EMAILS[id]||'';
+function outlookComposeUrl(to,subject,body){
+  return 'https://outlook.office.com/mail/deeplink/compose?to='+encodeURIComponent(to)+'&subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+}
+
+/* ---------------- consolidation engine ---------------- */
+function consolidate(){
+  const dd=D(state.project.dataDate);
+  const latest={};
+  [...state.reports].filter(r=>D(r.date)<=dd).sort((a,b)=>D(a.date)-D(b.date)).forEach(r=>r.lines.forEach(l=>{
+    const p=latest[l.taskId]; if(!p||D(r.date)>=D(p.reportDate)) latest[l.taskId]={...l,reportDate:r.date,contractor:r.contractor};
+  }));
+  const base={};
+  state.tasks.forEach(t=>{
+    const info=latest[t.id],ps=D(t.ps),pe=D(t.pe),dur=Math.max(1,days(ps,pe)),deliverableProgress=deliverableSummary(t.id,state.project.dataDate),pct=deliverableProgress.total?deliverableProgress.earned:(info?info.percent:0);
+    let aStart=info&&info.actualStart?D(info.actualStart):(pct>0?ps:null);
+    let aFinish=null;const done=pct>=100;
+    if(done)aFinish=info&&info.actualFinish?D(info.actualFinish):(info?D(info.reportDate):pe);
+    base[t.id]={t,ps,pe,dur,pct,aStart,aFinish,done,info};
+  });
+  state.tasks.forEach(t=>{
+    const b=base[t.id],depFin=t.dep&&base[t.dep]?base[t.dep]._finish:null;
+    let fStart;
+    if(b.aStart)fStart=b.aStart;else{fStart=b.ps;if(depFin&&depFin>fStart)fStart=depFin;if(!b.done&&fStart<dd)fStart=dd;}
+    b._start=fStart;
+    let fFin;
+    if(b.done)fFin=b.aFinish;
+    else if(b.pct>0&&b.aStart){const el=Math.max(1,days(b.aStart,dd));fFin=addD(b.aStart,Math.round(Math.max(el/(b.pct/100),b.dur)));if(fFin<dd)fFin=dd;}
+    else fFin=addD(fStart,b.dur);
+    b._finish=fFin;
+  });
+  const rows=state.tasks.map(t=>{
+    const b=base[t.id],fin=b._finish,varDays=days(b.pe,fin);
+    let pl;if(dd>=b.pe)pl=100;else if(dd<=b.ps)pl=0;else pl=days(b.ps,dd)/b.dur*100;
+    let status;
+    if(b.done)status='done';
+    else if(!t.contractor)status='tender';
+    else if(b.pct===0&&dd<b.ps)status='notstarted';
+    else if(varDays>5)status='delayed';
+    else if(b.pct<pl-8)status='atrisk';
+    else status='ontrack';
+    return{...t,pct:b.pct,plannedPct:pl,aStart:b.aStart?iso(b.aStart):null,aFinish:b.aFinish?iso(b.aFinish):null,
+      forecast:iso(fin),forecastStart:iso(b._start),varDays,status,dur:b.dur,depName:t.dep?base[t.dep].t.name:null,
+      depSlip:t.dep?days(base[t.dep].t.pe,base[t.dep]._finish):0};
+  });
+  const byId={};rows.forEach(r=>byId[r.id]=r);
+  const ms=state.milestones.map(m=>{
+    const g=byId[m.gov];let fc=m.govEnd?(g?g.forecast:m.plan):(g?(g.aStart||m.plan):m.plan);
+    const v=days(m.plan,fc);const done=g?(m.govEnd?g.status==='done':g.pct>0):false;
+    let status=done?'done':(v>5?'delayed':(v>0?'atrisk':'ontrack'));
+    return{...m,forecast:fc,varDays:v,status,done};
+  });
+  return{rows,byId,ms,dd};
+}
+/* ---------------- proposal scoring ---------------- */
+function scoreTender(t){
+  const ps=t.proposals.map((p,proposalIndex)=>({...p,proposalIndex}));
+  const min=k=>Math.min(...ps.map(p=>p[k])),max=k=>Math.max(...ps.map(p=>p[k]));
+  const avMin=Math.min(...ps.map(p=>D(p.availableFrom))),avMax=Math.max(...ps.map(p=>D(p.availableFrom)));
+  const norm=(v,lo,hi,inv)=>{if(hi===lo)return 1;const x=(v-lo)/(hi-lo);return inv?1-x:x;};
+  ps.forEach(p=>{
+    const cost=norm(p.price,min('price'),max('price'),true);
+    const dur =norm(p.durationDays,min('durationDays'),max('durationDays'),true);
+    const risk=norm(p.riskPct,min('riskPct'),max('riskPct'),true);
+    const rate=norm(ratingOf(p.contractor),3.5,5,false);
+    const avail=norm(D(p.availableFrom).getTime(),avMin,avMax,true);
+    p.score=Math.round((cost*0.30+dur*0.28+risk*0.20+rate*0.10+avail*0.12)*100);
+  });
+  ps.sort((a,b)=>b.score-a.score);
+  return ps;
+}
+
+/* ============================================================ RENDER ============================================================ */
+
+function renderHeader(){
+  document.getElementById('dataDate').value=state.project.dataDate;
+}
+function renderRoster(){
+  state.outboundInstructions=state.outboundInstructions||[];
+  state.drawings=state.drawings||[];
+  const schedule=consolidate(),finalMilestone=schedule.ms.at(-1),projectDelay=Math.max(0,finalMilestone.varDays);
+  document.getElementById('projectDelaySummary').innerHTML=`<div class="delay-summary ${projectDelay?'late':'on-plan'}"><div><span class="delay-kicker">TOTAL PROJECT DELAY</span><strong>${projectDelay} ${projectDelay===1?'day':'days'}</strong></div><div><span>Planned completion</span><b>${fmt(finalMilestone.plan)}</b></div><div><span>Forecast completion</span><b>${fmt(finalMilestone.forecast)}</b></div><p>${projectDelay?`Verified deliverable gates and dependencies forecast practical completion ${projectDelay} days late.`:'The current forecast remains on the planned completion date.'}</p></div>`;
+  document.getElementById('roster').innerHTML=state.contractors.map(c=>{
+    const assigned=state.tasks.filter(t=>t.contractor===c.id);
+    const delivery=assigned.map(t=>schedule.byId[t.id]).filter(Boolean),worst=delivery.reduce((max,r)=>!max||r.varDays>max.varDays?r:max,null),delay=worst?Math.max(0,worst.varDays):null,late=lateSubmissions(c.id);
+    return `<div class="card" id="contractor-card-${c.id}"><div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div><h3>${c.name}</h3><div class="meta">${c.discipline}</div></div>
+        <div class="contractor-card-flags"><span class="tag ${c.kind.toLowerCase()}"><i></i>${c.kind}</span>${late.length?`<span class="late-submission-flag">${late.length} LATE SUBMISSION${late.length===1?'':'S'}</span>`:''}</div></div>
+      <div style="margin-top:14px">
+        <div class="cstat"><span class="muted">Autonomy</span><span>${c.autonomy}</span></div>
+        <div class="cstat"><span class="muted">Capacity</span><span>${c.rate}</span></div>
+        <div class="cstat"><span class="muted">Packages</span><span>${assigned.length?assigned.map(t=>t.name.split(' ')[0]).join(', '):'—'}</span></div>
+        <div class="cstat"><span class="muted">Status</span><span style="color:${c.status==='Available'?'var(--robot)':(c.status==='Complete'?'var(--good)':'var(--ink)')};font-weight:600">${c.status}</span></div>
+        <div class="cstat delay-row"><span class="muted">Schedule delay</span><span class="delay-value ${delay>0?'late':'clear'}">${delay===null?'No assigned package':delay>0?`+${delay} days`:'0 days'}</span></div>
+        ${worst&&delay>0?`<div class="delay-driver">Driven by ${esc(worst.name)} · forecast ${fmt(worst.forecast)}</div>`:''}
+      </div>
+      <div class="contractor-actions">
+        <button class="btn ghost sm" onclick="openContractorSchedule('${c.id}')">View schedule</button>
+        <button class="btn sm" onclick="toggleContractorAction('${c.id}','instruction')">Send instruction</button>
+        <button class="btn ghost sm" onclick="toggleContractorAction('${c.id}','chat')">Open chat</button>
+        <button class="btn ghost sm" onclick="toggleContractorAction('${c.id}','drawing')">Update drawing</button>
+        <a class="btn ghost sm" href="contractor-portal.html?contractor=${encodeURIComponent(c.id)}#inbox" target="_blank" rel="noopener">Open portal ↗</a>
+      </div>
+      <div class="contractor-action-panel" id="instruction-form-${c.id}" hidden>
+        <label for="instruction-title-${c.id}">Instruction title</label>
+        <input id="instruction-title-${c.id}" placeholder="e.g. Start north-zone trench preparation">
+        <label for="instruction-detail-${c.id}">Instruction details</label>
+        <textarea id="instruction-detail-${c.id}" placeholder="State the required action, location and completion criteria."></textarea>
+        <div class="action-form-row"><div><label for="instruction-priority-${c.id}">Priority</label><select id="instruction-priority-${c.id}"><option value="normal">Normal</option><option value="high">High</option></select></div><div><label for="instruction-due-${c.id}">Due date</label><input type="date" id="instruction-due-${c.id}" min="${state.project.dataDate}" value="${clarDefault()}"></div></div>
+        <div class="outlook-delivery">
+          <label class="outlook-choice" for="instruction-outlook-${c.id}"><input type="checkbox" id="instruction-outlook-${c.id}" checked><span>Send a copy through Outlook</span></label>
+          <label for="instruction-email-${c.id}">Recipient email</label>
+          <input type="email" id="instruction-email-${c.id}" value="${esc(contractorEmail(c.id))}" placeholder="contractor@company.com">
+          <small>Outlook opens a ready-to-send email with the full instruction.</small>
+        </div>
+        <div class="action-buttons"><button class="btn sm" onclick="sendRosterInstruction('${c.id}')">Send instruction</button><button class="btn ghost sm" onclick="toggleContractorAction('${c.id}','instruction')">Cancel</button></div>
+      </div>
+      <div class="contractor-action-panel contractor-chat-panel" id="chat-form-${c.id}" hidden>
+        <div class="owner-chat-heading"><div><b>Chat with ${esc(c.name)}</b><small>Shared live conversation with the contractor portal</small></div><button class="owner-chat-close" onclick="toggleContractorAction('${c.id}','chat')" aria-label="Close chat">×</button></div>
+        <div class="owner-chat-messages" id="owner-chat-messages-${c.id}">${ownerChatHtml(c.id)}</div>
+        <textarea id="owner-chat-input-${c.id}" placeholder="Write a message to ${esc(c.name)}…"></textarea>
+        <div class="action-buttons"><button class="btn sm" onclick="sendOwnerChat('${c.id}')">Send message</button></div>
+      </div>
+      <div class="contractor-action-panel" id="drawing-form-${c.id}" hidden>
+        <label for="drawing-title-${c.id}">Drawing title</label>
+        <input id="drawing-title-${c.id}" placeholder="e.g. Ductbank alignment — Grid E">
+        <div class="action-form-row"><div><label for="drawing-revision-${c.id}">Revision</label><input id="drawing-revision-${c.id}" placeholder="e.g. P03"></div><div><label for="drawing-zone-${c.id}">Work area</label><input id="drawing-zone-${c.id}" value="${esc(LOC[c.id]?.zone||'')}"></div></div>
+        <label for="drawing-file-${c.id}">Drawing file (optional, max 2 MB)</label>
+        <input type="file" id="drawing-file-${c.id}" accept=".pdf,.png,.jpg,.jpeg,.svg,.dwg,.dxf">
+        <label for="drawing-note-${c.id}">Revision note</label>
+        <textarea id="drawing-note-${c.id}" placeholder="Describe exactly what changed and what the contractor must use."></textarea>
+        <div class="action-buttons"><button class="btn sm" onclick="publishDrawing('${c.id}')">Publish live update</button><button class="btn ghost sm" onclick="toggleContractorAction('${c.id}','drawing')">Cancel</button></div>
+      </div>
+      ${state.outboundInstructions.filter(x=>x.contractor===c.id).slice(-1).map(x=>`<div class="card-live-update"><span class="live-dot"></span><b>${esc(x.title)}</b><small>Portal: ${esc(x.status)}${x.emailStatus?' · '+esc(x.emailStatus):''} · ${fmt(x.ts.slice(0,10))}</small>${x.reply?`<p>${esc(x.reply)}</p>`:''}${x.emailUrl?`<a href="${esc(x.emailUrl)}" target="_blank" rel="noopener">Open Outlook email ↗</a>`:''}</div>`).join('')}
+      ${state.drawings.filter(x=>x.contractor===c.id).slice(-1).map(x=>`<div class="card-live-update drawing"><span class="live-dot"></span><b>${esc(x.title)} · ${esc(x.revision)}</b><small>Live drawing · ${fmt(x.ts.slice(0,10))}${x.fileName?' · '+esc(x.fileName):''}</small>${x.fileData?`<a href="${x.fileData}" download="${esc(x.fileName)}">Open drawing</a>`:''}</div>`).join('')}
+      </div>`;}).join('');
+}
+window.openContractorSchedule=function(id){selectMgmt(id);document.getElementById('mgmtDetail').scrollIntoView({behavior:'smooth',block:'start'});};
+window.toggleContractorAction=function(cid,type){
+  const target=document.getElementById(type+'-form-'+cid),open=target.hidden;
+  document.querySelectorAll('.contractor-action-panel').forEach(x=>x.hidden=true);
+  target.hidden=!open;if(open)target.scrollIntoView({block:'nearest'});
+};
+window.sendRosterInstruction=function(cid){
+  const title=document.getElementById('instruction-title-'+cid).value.trim(),detail=document.getElementById('instruction-detail-'+cid).value.trim();
+  const priority=document.getElementById('instruction-priority-'+cid).value,due=document.getElementById('instruction-due-'+cid).value;
+  const outlook=document.getElementById('instruction-outlook-'+cid)?.checked===true,email=document.getElementById('instruction-email-'+cid)?.value.trim()||'';
+  if(!title||!detail){toast('Add an instruction title and details');return;}
+  if(!due||due<state.project.dataDate){toast('Choose a valid due date');return;}
+  if(outlook&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){toast('Add a valid contractor email address');return;}
+  const subject=`Bohio instruction · ${title}`;
+  const body=`Project: ${state.project.name}\nContractor: ${C(cid).name}\nPriority: ${priority.toUpperCase()}\nDue: ${fmt(due)}\n\nInstruction\n${detail}\n\nSent from Bohio Contractor Platform.`;
+  const emailUrl=outlook?outlookComposeUrl(email,subject,body):'';
+  const id='ri'+Date.now(),item={id,contractor:cid,title,detail,priority,due,ts:state.project.dataDate+'T'+new Date().toTimeString().slice(0,5),status:C(cid).kind==='Robot'?'Dispatched':'Sent',reply:'',email:outlook?email:'',emailStatus:outlook?'Outlook draft opened':'',emailUrl};
+  state.outboundInstructions.push(item);
+  state.demoRecipient=cid;
+  bridgePush({id:'ri:'+id,to:cid,from:'PMC',org:'Programme Management',ts:item.ts,priority,pkg:'',title,detail,deadline:due});
+  state.intFeed.unshift({ts:'now',t:`${C(cid).name} ▸ instruction sent${outlook?' and Outlook email prepared':''}: ${title}`});
+  if(emailUrl&&typeof window.open==='function')window.open(emailUrl,'_blank','noopener');
+  save();renderAll();toast(`Instruction sent to ${C(cid).name}${outlook?' · Outlook email ready':''}`);
+};
+window.publishDrawing=async function(cid){
+  const title=document.getElementById('drawing-title-'+cid).value.trim(),revision=document.getElementById('drawing-revision-'+cid).value.trim().toUpperCase();
+  const zone=document.getElementById('drawing-zone-'+cid).value.trim(),note=document.getElementById('drawing-note-'+cid).value.trim(),file=document.getElementById('drawing-file-'+cid).files?.[0];
+  if(!title||!revision){toast('Add a drawing title and revision');return;}
+  if(file&&file.size>2*1024*1024){toast('Choose a drawing file smaller than 2 MB');return;}
+  let fileData='';if(file&&['application/pdf','image/png','image/jpeg','image/svg+xml'].includes(file.type)){fileData=await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>resolve('');reader.readAsDataURL(file);});}
+  const id='dwg'+Date.now(),ts=state.project.dataDate+'T'+new Date().toTimeString().slice(0,5);
+  state.drawings.push({id,contractor:cid,title,revision,zone,note,fileName:file?.name||'',fileData,ts,status:'Live'});
+  const detail=`Drawing ${title}, revision ${revision}, is now live${zone?' for '+zone:''}.${note?' Change note: '+note:''}${file?.name?' File: '+file.name+'.':''}`;
+  bridgePush({id:'drawing:'+id,to:cid,from:'PMC',org:'Design Management',ts,priority:'high',pkg:zone,title:`Drawing update · ${title} · ${revision}`,detail,fileName:file?.name||'',fileData});
+  state.intFeed.unshift({ts:'now',t:`${C(cid).name} ▸ live drawing published: ${title} ${revision}`});
+  save();renderAll();toast(`Drawing ${revision} published to ${C(cid).name}`);
+};
+/* -------- retained award data supports existing project records -------- */
+window.award=function(taskId,contractorId,proposalIndex){
+  const t=state.tenders.find(x=>x.taskId===taskId);
+  if(!t||t.awardedTo)return;
+  const selected=Number.isInteger(proposalIndex)?t.proposals[proposalIndex]:t.proposals.find(p=>p.contractor===contractorId);
+  if(!selected||selected.contractor!==contractorId)return;
+  t.awardedProposal={...selected};
+  t.awardedTo=contractorId;
+  const task=state.tasks.find(x=>x.id===taskId);task.contractor=contractorId;
+  const c0=C(contractorId);const p=selected;
+  if(p){task.ps=p.availableFrom;task.pe=iso(addD(D(p.availableFrom),p.durationDays));}
+  state.intFeed.unshift({ts:'now',t:`${c0.kind==='Robot'?'Trimble ▸ award dispatched to '+c0.name+' fleet controller':'SAP S/4HANA ▸ PO issued to '+c0.name}; Primavera P6 activity re-baselined.`});
+  save();renderAll();
+  toast(`Contract awarded · ${task.name} → ${c0.name}${c0.kind==='Robot'?' (autonomous fleet)':''}`);
+};
+/* -------- contractor management (worksite) -------- */
+let selMgmt=null;
+function latestReport(cid){const reports=state.reports.filter(r=>r.contractor===cid&&r.date<=state.project.dataDate).sort((a,b)=>a.date.localeCompare(b.date));if(!reports.length)return null;const lines=new Map();reports.forEach(r=>r.lines.forEach(l=>lines.set(l.taskId,l)));const last=reports.at(-1);return {date:last.date,source:last.source||'',syncStatus:last.syncStatus||'',lines:[...lines.values()]};}
+function renderManagement(){
+  state.clarifications=state.clarifications||[];
+  const c=consolidate();const statusOf={};
+  const rank=s=>({delayed:4,atrisk:3,ontrack:2,notstarted:1,done:1,tender:0}[s]||0);
+  c.rows.forEach(r=>{if(r.contractor){if(!statusOf[r.contractor]||rank(r.status)>rank(statusOf[r.contractor]))statusOf[r.contractor]=r.status;}});
+  if(!selMgmt||!LOC[selMgmt])selMgmt='voltaic';
+  renderSiteMap(statusOf);
+  renderMgmtDetail(statusOf);
+}
+function markerColor(id,statusOf){
+  if(statusOf[id]==='delayed')return 'var(--alert)';
+  return C(id).kind==='Robot'?'var(--robot)':'var(--ink)';
+}
+function renderSiteMap(statusOf){document.getElementById('mapDate').textContent=fmt(state.project.dataDate);Worksite.render(statusOf);}
+function initM(n){return n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();}
+window.selectMgmt=function(id){selMgmt=id;renderManagement();};
+function renderMgmtDetail(statusOf){
+  const id=selMgmt,c0=C(id),L=LOC[id];
+  const rep=latestReport(id),schedule=consolidate(),assignments=schedule.rows.filter(x=>x.contractor===id);const TN={};state.tasks.forEach(t=>TN[t.id]=t.name);
+  const st=statusOf[id]||'—';
+  const stMap={delayed:['delayed','Delayed'],atrisk:['atrisk','At risk'],ontrack:['ontrack','On track'],done:['done','Complete'],notstarted:['notstarted','Not started']};
+  const stp=stMap[st]?`<span class="pill ${stMap[st][0]}">${stMap[st][1]}</span>`:'';
+  const lastUpdate=rep?`<div class="muted" style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Evidence received ${fmt(rep.date)}${rep.source?` · ${esc(rep.source)}`:''}</div>
+     ${rep.lines.map(l=>{const d=deliverableSummary(l.taskId);return `<div class="cstat"><span>${TN[l.taskId]||l.taskId}</span><b>${d.verified}/${d.total} verified</b></div>`;}).join('')}`
+    :`<div class="muted">No formal progress report submitted yet.</div>`;
+  const reps=(SITE_REPORTS[id]||[]);
+  const repsHtml=reps.length?reps.map(r=>`<div class="srep"><div class="st">${fmt(r.date)}</div><div class="rt">${r.title}</div><div class="rs">${r.summary}</div></div>`).join(''):'<div class="muted">No site reports on file.</div>';
+  const clars=state.clarifications.filter(x=>x.contractor===id).sort((a,b)=>b.ts.localeCompare(a.ts));
+  const clarsHtml=clars.length?clars.map(x=>`<div class="claritem"><b>RFC</b> — ${esc(x.message)} <span class="muted">· sent ${fmt(x.ts.slice(0,10))} · </span><span class="due">due ${fmt(x.deadline)}</span> <span class="muted">· ${esc(x.status)}</span>${x.reply?`<div class="reply-text">Reply: ${esc(x.reply)}</div>`:''}</div>`).join(''):'';
+  const changeRequests=readScheduleChanges().filter(x=>x.contractor===id).sort((a,b)=>(b.requestedAt||'').localeCompare(a.requestedAt||''));
+  const scheduleHtml=assignments.length?assignments.map(r=>{const d=deliverableSummary(r.id);return `<article class="contractor-schedule-row"><div><strong>${esc(r.name)}</strong><span>${fmt(r.ps)} → ${fmt(r.pe)}</span><div class="schedule-progress-track discrete"><i style="width:${d.earned}%"></i></div></div><div><span>Verified deliverables</span><b>${d.verified} / ${d.total}</b></div><div><span>Forecast</span><b>${fmt(r.forecast)}</b></div><span class="pill ${r.status}">${r.status==='notstarted'?'Not started':r.status==='atrisk'?'At risk':r.status[0].toUpperCase()+r.status.slice(1)}</span></article>`;}).join(''):'<div class="muted">No schedule activities assigned.</div>';
+  const deliverablesHtml=assignments.map(r=>{const d=deliverableSummary(r.id),claims=(state.deliverableClaims||[]).filter(x=>x.taskId===r.id).sort((a,b)=>(b.claimedAt||'').localeCompare(a.claimedAt||''));return `<section class="deliverable-package"><div class="deliverable-package-head"><div><span>MEASURABLE WORK PACKAGE</span><h3>${esc(r.name)}</h3></div><strong>${d.verified}/${d.total} verified <small>${d.earned}% earned</small></strong></div><div class="deliverable-list">${d.items.map(item=>{const claim=claims.find(x=>x.deliverableId===item.id&&x.status==='Pending verification');return `<article class="deliverable-row ${item.verified?'verified':claim?'pending':''}"><span class="deliverable-state">${item.verified?'✓':claim?'…':item.sequence}</span><div><b>${esc(item.name)}</b><small>Target ${esc(item.measure)} · Accept with ${esc(item.acceptance)}</small>${claim?`<em>${esc(claim.actualQuantity||'Target claimed')} · ${esc(claim.evidence||'Evidence reference pending')}</em>`:''}</div><strong>${item.verified?'VERIFIED':claim?'PENDING CHECK':'0 EARNED'}</strong>${claim?`<button class="btn sm" onclick="verifyDeliverableClaim('${claim.id}',true)">Verify & sync</button><button class="btn ghost sm" onclick="verifyDeliverableClaim('${claim.id}',false)">Reject</button>`:''}</article>`;}).join('')}</div><p class="deliverable-rule">Partial quantities are tracked as work in progress. Earned progress changes only when the full deliverable and its acceptance evidence are verified.</p></section>`;}).join('');
+  const changesHtml=changeRequests.length?changeRequests.map(x=>`<article class="schedule-change ${x.status.toLowerCase()}"><div class="schedule-change-head"><strong>${esc(x.taskName)}</strong><span>${esc(x.status)}</span></div><p>${fmt(x.currentStart)} → ${fmt(x.currentFinish)} &nbsp; ⟶ &nbsp; <b>${fmt(x.proposedStart)} → ${fmt(x.proposedFinish)}</b></p><small>${esc(x.reason)} · submitted ${fmt((x.requestedAt||state.project.dataDate).slice(0,10))}</small>${x.status==='Pending planner approval'?`<div class="schedule-approval-actions"><button class="btn sm" onclick="reviewScheduleChange('${x.id}',true)">Approve & sync to Primavera</button><button class="btn ghost sm" onclick="reviewScheduleChange('${x.id}',false)">Reject</button></div>`:`<div class="schedule-review-result">${x.status==='Approved'?`Primavera P6 · ${esc(x.syncId||'Synced automatically')}`:esc(x.reviewNote||'No schedule change made')}</div>`}</article>`).join(''):'<div class="muted">No schedule changes submitted.</div>';
+  const late=lateSubmissions(id),submissionHtml=(state.submissions||[]).filter(x=>x.contractor===id).map(x=>`<div class="submission-row ${!x.submittedAt&&x.due<state.project.dataDate?'late':''}"><div><b>${esc(x.title)}</b><span>Due ${fmt(x.due)}</span></div>${x.submittedAt?`<span class="submission-ok">Submitted ${fmt(x.submittedAt)}</span>`:`<span>${x.due<state.project.dataDate?'LATE':'Outstanding'}</span>`}</div>`).join('');
+  document.getElementById('mgmtDetail').innerHTML=`<div class="panel">
+    <div class="mgmt-detail-h">
+      <div><h3>${c0.name}</h3><div class="z">${L.zone}</div></div>
+      <div style="text-align:right"><span class="tag ${c0.kind.toLowerCase()}"><i></i>${c0.kind}</span><div style="margin-top:8px">${stp}</div></div>
+    </div>
+    ${late.length?`<div class="contractor-late-alert"><b>${late.length} late submission${late.length===1?'':'s'}</b><span>Contractor action required</span></div>`:''}
+    <div class="p6-automation-strip"><span class="automation-pulse"></span><div><b>Primavera verified-deliverable sync active</b><small>Only accepted deliverables earn progress. Partial work and percentage claims remain evidence; date changes require planner approval.</small></div></div>
+    <h2 class="section" style="margin:20px 0 12px">Contractor schedule</h2>
+    <div class="contractor-schedule">${scheduleHtml}</div>
+    <h2 class="section" style="margin:20px 0 12px">Deliverable register</h2>
+    <div>${deliverablesHtml}</div>
+    <h2 class="section" style="margin:20px 0 12px">Schedule change requests</h2>
+    <div>${changesHtml}</div>
+    ${submissionHtml?`<h2 class="section" style="margin:20px 0 12px">Required submissions</h2><div class="submission-list">${submissionHtml}</div>`:''}
+    <h2 class="section" style="margin:6px 0 12px">Last update on the work</h2>
+    ${lastUpdate}
+    <h2 class="section" style="margin:20px 0 12px">Latest site reports</h2>
+    ${repsHtml}
+    <h2 class="section" style="margin:20px 0 12px">Send request</h2>
+    ${clarsHtml?`<div style="margin-bottom:12px">${clarsHtml}</div>`:''}
+    <div class="clar">
+      <textarea aria-label="Clarification request" id="clarMsg" placeholder="e.g. Confirm revised energization date and night-crew resourcing for the ductbank recovery."></textarea>
+      <div class="row">
+        <label for="clarDue">Response due</label>
+        <input type="date" id="clarDue" min="${state.project.dataDate}" value="${clarDefault()}">
+        <div style="flex:1"></div>
+        <button class="btn sm" onclick="sendClarification('${id}')">Send request</button>
+      </div>
+    </div>
+  </div>`;
+}
+window.reviewScheduleChange=function(requestId,approve){
+  const requests=readScheduleChanges(),request=requests.find(x=>x.id===requestId);
+  if(!request||request.status!=='Pending planner approval')return;
+  const task=state.tasks.find(x=>x.id===request.taskId&&x.contractor===request.contractor);
+  if(!task){toast('Schedule activity could not be found');return;}
+  request.reviewedAt=state.project.dataDate+'T'+new Date().toTimeString().slice(0,5);
+  request.reviewedBy='Project Planner';
+  if(approve){
+    task.ps=request.proposedStart;task.pe=request.proposedFinish;request.status='Approved';
+    request.syncId=automatePrimavera('schedule_change',`${C(request.contractor).name} · ${task.name} dates approved by Project Planner`,{taskId:task.id,taskName:task.name,reporterRole:'Planner / Project Manager'});
+    request.reviewNote='Planner approved · schedule of record updated automatically';
+  }else{request.status='Rejected';request.reviewNote='Planner rejected · Primavera schedule unchanged';}
+  writeScheduleChanges(requests);save();renderAll();toast(approve?'Planner approved · Primavera updated automatically':'Schedule change rejected');
+};
+window.verifyDeliverableClaim=function(claimId,approve){
+  const claim=(state.deliverableClaims||[]).find(x=>x.id===claimId),deliverable=claim&&(state.deliverables||[]).find(x=>x.id===claim.deliverableId);
+  if(!claim||!deliverable||claim.status!=='Pending verification')return;
+  claim.reviewedAt=state.project.dataDate+'T'+new Date().toTimeString().slice(0,5);claim.reviewedBy='Bohio verifier';
+  const linked=(state.whatsappUpdates||[]).find(x=>x.claimId===claim.id);
+  if(!approve){claim.status='Rejected';claim.reviewNote='Evidence did not prove the full acceptance target. No progress earned.';if(linked)linked.scheduleStatus=claim.reviewNote;save();renderAll();toast('Deliverable rejected · Primavera unchanged');return;}
+  if(Number.isFinite(Number(claim.actualValue))&&Number(claim.actualValue)<Number(deliverable.target)){toast(`Target not met · ${deliverable.measure} required`);return;}
+  if(!claim.evidence){toast('Verification evidence is required');return;}
+  deliverable.status='Verified';deliverable.verifiedDate=state.project.dataDate;deliverable.evidence=claim.evidence;deliverable.actualValue=claim.actualValue||deliverable.target;
+  claim.status='Verified';const earned=deliverableSummary(deliverable.taskId).earned,task=state.tasks.find(x=>x.id===deliverable.taskId);
+  const mediaEvidence=linked?{source:linked.source||'Twilio WhatsApp · Planner/PM',reporterRole:linked.reporterRole||'Planner / Project Manager',taskId:task?.id||claim.taskId,taskName:task?.name||claim.taskId,mediaUrl:linked.mediaUrl||'',mediaType:linked.mediaType||'',mediaContentType:linked.mediaContentType||'',transcript:linked.transcript||'',imageAnalysis:linked.imageAnalysis||'',originalEvidence:claim.evidence}:{source:claim.source||'Project input',reporterRole:'Planner / Project Manager',taskId:task?.id||claim.taskId,taskName:task?.name||claim.taskId,originalEvidence:claim.evidence};
+  claim.syncId=automatePrimavera('deliverable_verified',`${C(claim.contractor).name} · ${task?.name||deliverable.taskId} · ${deliverable.name} verified · ${earned}% earned progress`,mediaEvidence);
+  state.reports.push({id:'dv:'+claim.id,contractor:claim.contractor,date:state.project.dataDate,source:'Verified deliverable',syncId:claim.syncId,syncStatus:'Synced automatically',evidence:claim.evidence,mediaEvidence,lines:[{taskId:deliverable.taskId,percent:earned,actualStart:earned>0?state.project.dataDate:null,actualFinish:earned===100?state.project.dataDate:null}]});
+  if(linked){linked.syncId=claim.syncId;linked.scheduleStatus=`Verified deliverable synchronized · ${claim.syncId}`;linked.claimStatus='Verified';linked.earnedAfter=earned;state.whatsappUpdates=[linked,...state.whatsappUpdates.filter(x=>x!==linked)];}
+  save();renderAll();toast(`Deliverable verified · ${earned}% earned · Primavera synchronized`);
+};
+function clarDefault(){const d=addD(D(state.project.dataDate),3);return iso(d);}
+// Cross-interface bridge: deliver instructions to the contractor portal
+// (shared localStorage; live when both are served from the same origin).
+const BRIDGE_MSGS='bohio_bridge_msgs';
+const OWNER_CHAT_KEY='bohio_owner_contractor_chat_v1';
+function bridgePush(msg){try{const a=JSON.parse(localStorage.getItem(BRIDGE_MSGS)||'[]');if(!a.find(m=>m.id===msg.id)){a.push(msg);localStorage.setItem(BRIDGE_MSGS,JSON.stringify(a));}}catch(e){}}
+function readOwnerChat(){try{const value=JSON.parse(localStorage.getItem(OWNER_CHAT_KEY)||'[]');return Array.isArray(value)?value:[];}catch{return [];}}
+function ownerChatHtml(contractor){const messages=readOwnerChat().filter(x=>x.contractor===contractor);return messages.length?messages.map(x=>`<div class="owner-chat-message ${x.from==='owner'?'owner':'contractor'}"><b>${x.from==='owner'?'Owner':esc(C(contractor).name)}</b><div>${esc(x.text)}</div><small>${fmt((x.ts||state.project.dataDate).slice(0,10))}${(x.ts||'').length>10?' · '+esc(x.ts.slice(11)):''}</small></div>`).join(''):'<div class="owner-chat-empty">No messages yet. Start a direct conversation with this contractor.</div>';}
+function refreshOwnerChats(){state.contractors.forEach(c=>{const box=document.getElementById('owner-chat-messages-'+c.id);if(box){box.innerHTML=ownerChatHtml(c.id);box.scrollTop=box.scrollHeight;}});}
+window.sendOwnerChat=function(contractor){const input=document.getElementById('owner-chat-input-'+contractor),text=input.value.trim();if(!text){toast('Write a message first');return;}const messages=readOwnerChat();messages.push({id:crypto.randomUUID(),contractor,from:'owner',text,ts:state.project.dataDate+'T'+new Date().toTimeString().slice(0,5)});localStorage.setItem(OWNER_CHAT_KEY,JSON.stringify(messages));input.value='';document.getElementById('owner-chat-messages-'+contractor).innerHTML=ownerChatHtml(contractor);state.intFeed.unshift({ts:'now',t:`${C(contractor).name} ▸ owner chat message sent`});save();toast(`Message sent to ${C(contractor).name}`);};
+window.sendClarification=function(id){
+  const msg=document.getElementById('clarMsg').value.trim();const due=document.getElementById('clarDue').value;
+  if(!msg){toast('Type your clarification request');return;}
+  if(!due||due<state.project.dataDate){toast('Choose a deadline on or after the project data date');return;}
+  state.clarifications=state.clarifications||[];
+  const qid='q'+Date.now();
+  state.clarifications.push({id:qid,contractor:id,message:msg,deadline:due,ts:state.project.dataDate+'T09:00',status:'Awaiting response'});
+  state.intFeed.unshift({ts:'now',t:`Procore ▸ clarification request (RFC) sent to ${C(id).name}, due ${fmt(due)}.`});
+  if(C(id).kind==='Human')bridgePush({id:'q:'+qid,to:id,from:'PMC',org:'Programme Management',ts:state.project.dataDate+'T09:00',priority:'normal',pkg:'',title:'Request for clarification',detail:msg,deadline:due});
+  save();renderAll();
+  toast(`Clarification request sent to ${C(id).name} · due ${fmt(due)}`);
+};
+/* -------- agent console -------- */
+function routeFor(kind){return kind==='Robot'?'Trimble WorksManager (fleet MCP)':'Procore RFI (human MCP)';}
+window.issueDir=function(id){
+  const d=state.directives.find(x=>x.id===id);if(!d||d.status!=='Draft')return;const c0=C(d.contractor);
+  d.status='Issued';d.ts=state.project.dataDate+'T'+new Date().toTimeString().slice(0,5);
+  if(c0.kind==='Human'){const task=state.tasks.find(t=>t.id===d.taskId);bridgePush({id:'d:'+d.id,to:d.contractor,from:'Agent',org:'Bohio Platform',ts:d.ts,priority:'high',pkg:task?task.name:'',title:d.title,detail:d.detail});}
+  save();renderAll();
+  toast(`${c0.kind==='Robot'?'Dispatched to '+c0.name+' fleet':'Issued to '+c0.name}`);
+  if(c0.kind==='Robot')setTimeout(()=>{if(!state.directives.includes(d)||d.status!=='Issued')return;d.status='Acknowledged';save();if(cur==='agent')renderAll();},1200);
+  if(c0.kind==='Robot')setTimeout(()=>{if(!state.directives.includes(d)||d.status!=='Acknowledged')return;d.status='Executing';save();if(cur==='agent')renderAll();},2600);
+};
+window.dropDir=function(id){state.directives=state.directives.filter(x=>x.id!==id);save();renderAll();};
+window.generateRecs=function(){
+  const c=consolidate();const existing=new Set(state.directives.map(d=>d.taskId+'|'+d.title.slice(0,12)));
+  const flagged=c.rows.filter(r=>r.status==='delayed'||r.status==='atrisk'||(r.status==='tender'&&r.varDays>5));let added=0;
+  flagged.forEach(r=>{
+    const c0=r.contractor?C(r.contractor):null;
+    let title,detail;
+    if(!r.contractor){ // tender package predicted late — recommend awarding recommended (often robot)
+      const tn=state.tenders.find(t=>t.taskId===r.id);if(!tn||tn.awardedTo)return;const rec=scoreTender(tn)[0];const rc=C(rec.contractor);
+      title=`Award ${r.name} to ${rc.name}${rc.kind==='Robot'?' (interchangeable robot fleet)':''}`;
+      detail=`Package is unassigned and its predecessor slip pushes it ${r.varDays}d late. ${rc.name} (${rc.kind}) is the highest-fit bid — awarding now protects the downstream milestone.`;
+    } else if(r.pct>0){
+      title=c0.kind==='Robot'?`Scale ${c0.name} — add autonomous unit / extend shift`:`Authorize accelerated schedule on ${r.name}`;
+      detail=`${r.name} is ${r.varDays}d behind. ${c0.kind==='Robot'?'Add a unit and extend the autonomous operating window to recover.':'Add a shift/crew to close the gap before it hits the milestone.'}`;
+    } else {
+      title=`Re-sequence ${r.name} — pre-position at ready sub-section`;
+      detail=`${r.name} cannot start until ${r.depName} finishes (${r.depSlip>0?'+'+r.depSlip+'d':'on plan'}). Pre-position ${c0.name} at a ready sub-section to start partial works.`;
+    }
+    const key=r.id+'|'+title.slice(0,12);if(existing.has(key))return;
+    const cid=r.contractor||scoreTender(state.tenders.find(t=>t.taskId===r.id)).length&&scoreTender(state.tenders.find(t=>t.taskId===r.id))[0].contractor;
+    state.directives.push({id:'d'+Date.now()+Math.floor(Math.random()*99),ts:state.project.dataDate+'T09:00',taskId:r.id,contractor:cid,title,detail,trigger:`Predicted: ${r.name} +${r.varDays}d vs plan`,status:'Draft'});
+    added++;
+  });
+  save();renderAll();
+  const anth=anthGet();const via=' · demo rules';
+  toast(added?`Drafted ${added} directive${added>1?'s':''} from predicted breaches${via}`:'No new breaches to act on');
+};
+window.issueAll=function(){state.directives.filter(d=>d.status==='Draft').forEach(d=>issueDir(d.id));};
+/* -------- integrations -------- */
+function renderIntegrations(){
+  document.getElementById('integrations').innerHTML=state.integrations.map(i=>`
+    <div class="intcard"><h3><span class="dot ${i.status==='Connected'?'g':''}"></span>${i.name}</h3><div class="v">${i.role}</div>
+      <div style="margin-top:12px">
+        <div class="cstat"><span class="muted">Protocol</span><span><span class="pill tender" style="border-color:var(--robot);color:var(--robot)">${esc(i.kind||'MCP')}</span></span></div>
+        <div class="cstat"><span class="muted">Server</span><span><code class="k">${i.server}</code></span></div>
+        <div class="cstat"><span class="muted">Status</span><span style="color:var(--good);font-weight:600">${i.status}</span></div>
+        <div class="cstat"><span class="muted">Last sync</span><span>${i.last.slice(11)} · ${i.last.slice(5,10).replace('-','/')}</span></div>
+        <div class="cstat"><span class="muted">Payload</span><span>${i.records}</span></div>
+      </div></div>`).join('');
+  document.getElementById('intFeed').innerHTML=state.intFeed.map(f=>`<div class="ln"><span class="ts">${f.ts}</span><span>${esc(f.t)}</span></div>`).join('');
+  document.getElementById('mcpConfig').innerHTML=`{
+  <span class="c1">"mcpServers"</span>: {
+    <span class="c1">"primavera-p6"</span>: {
+      <span class="c1">"command"</span>: <span class="c3">"node"</span>,
+      <span class="c1">"args"</span>: [<span class="c3">"mcp/primavera-mcp-server.mjs"</span>],
+      <span class="c1">"env"</span>: {
+        <span class="c1">"P6_BASE_URL"</span>: <span class="c3">"https://p6.example.com/p6ws"</span>,
+        <span class="c1">"P6_API_KEY"</span>: <span class="c3">"\${P6_API_KEY}"</span>
+      }
+    },
+    <span class="c1">"trimble-works"</span>: { <span class="c1">"command"</span>: <span class="c3">"node"</span>, <span class="c1">"args"</span>: [<span class="c3">"mcp/trimble-mcp-server.mjs"</span>] }
+  }
+}`;
+  const tools=[
+    ['list_activities','Read the P6 activity list with dates, verified gates and float'],
+    ['get_activity','Fetch one activity + relationships'],
+    ['update_progress','Write verified deliverable status and actual dates back to P6'],
+    ['get_critical_path','Return the current critical path & total float'],
+    ['rebaseline','Re-baseline after an award / re-sequence'],
+    ['push_directive','Attach an agent directive to an activity as a note/RFI'],
+  ];
+  document.getElementById('mcpTools').innerHTML=`<thead><tr><th>Tool</th><th>Purpose</th></tr></thead><tbody>${tools.map(t=>`<tr><td><code class="k">${t[0]}</code></td><td class="muted">${t[1]}</td></tr>`).join('')}</tbody>`;
+  const monday=state.integrations.find(x=>x.id==='monday');renderMondayStatus({configured:monday?.status==='Connected',message:monday?.status==='Connected'?'Connected · verified gates mirror automatically':'Add the Monday token and board ID in Vercel'});
+}
+function renderMondayStatus(result){
+  const dot=document.getElementById('mondayDot'),status=document.getElementById('mondayStatus'),link=document.getElementById('mondayBoardLink');if(!dot||!status)return;
+  dot.className='dot'+(result?.configured?' g':'');status.textContent=result?.message||(result?.configured?'Connected to the Bohio project board':'Add the Monday token and board ID in Vercel');
+  if(result?.boardUrl){link.href=result.boardUrl;link.textContent='Open project board ↗';}
+}
+async function testMondayConnection(){
+  renderMondayStatus({message:'Checking Monday.com…'});
+  try{const response=await fetch('/api/monday',{cache:'no-store'}),result=await response.json();renderMondayStatus(result);if(result.configured){const integration=state.integrations.find(x=>x.id==='monday');integration.status='Connected';integration.records='Verified gates only';save();renderIntegrations();}}
+  catch{renderMondayStatus({configured:false,message:'Connection unavailable in this preview'});}
+}
+/* -------- Anthropic API config (stored locally, never transmitted by this demo) -------- */
+const ANTH_KEY='bohio_anthropic_key', ANTH_MODEL='bohio_anthropic_model';
+function anthGet(){try{return{key:localStorage.getItem(ANTH_KEY)||'',model:localStorage.getItem(ANTH_MODEL)||'claude-opus-5'};}catch(e){return{key:'',model:'claude-opus-5'};}}
+function anthModelLabel(id){return{'claude-opus-5':'Claude Opus 5','claude-sonnet-5':'Claude Sonnet 5','claude-haiku-4-5-20251001':'Claude Haiku 4.5','claude-fable-5-1':'Claude Fable 5.1'}[id]||id;}
+function renderAnth(){
+  const {key,model}=anthGet();
+  const dot=document.getElementById('anthDot'),st=document.getElementById('anthStatus');
+  document.getElementById('anthModel').value=model;
+  if(key){dot.style.background='var(--good)';st.textContent='Demo configuration · '+anthModelLabel(model);}
+  else{dot.style.background='var(--ink-hairline)';st.textContent='Not configured';}
+}
+/* -------- project agent: answers from current demo state and navigates this interface -------- */
+function openProjectArea(area,contractorId=''){
+  if(area==='orchestration'||area==='settings'){showView('orchestration');document.querySelectorAll('.tab[data-view]').forEach(t=>t.classList.toggle('active',t.dataset.view==='orchestration'));return;}
+  showView('contractors');document.querySelectorAll('.tab[data-view]').forEach(t=>t.classList.toggle('active',t.dataset.view==='contractors'));
+  if(contractorId){selectMgmt(contractorId);document.getElementById('mgmtDetail').scrollIntoView({behavior:'smooth',block:'start'});return;}
+  document.getElementById(area==='map'?'siteMap':'roster').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function projectAnswer(question){
+  const q=question.toLowerCase(),schedule=consolidate(),final=schedule.ms.at(-1),delay=Math.max(0,final.varDays);
+  const named=state.contractors.find(c=>q.includes(c.name.toLowerCase())||q.includes(c.name.toLowerCase().split(' ')[0]));
+  if(named){const work=schedule.rows.filter(r=>r.contractor===named.id),worst=work.reduce((a,r)=>!a||r.varDays>a.varDays?r:a,null),d=worst?deliverableSummary(worst.id):null;openProjectArea('map',named.id);return `${named.name} has ${work.length} assigned package${work.length===1?'':'s'}. ${worst?`${worst.name} has ${d.verified} of ${d.total} measurable deliverables verified, giving ${d.earned}% earned progress, and is forecast ${Math.max(0,worst.varDays)} days late.`:'No assigned work is recorded.'} I opened the contractor detail.`;}
+  if(q.includes('agent')||q.includes('recommend')||q.includes('setting')||q.includes('integration')){openProjectArea('orchestration');return 'I opened the Orchestration Agent and its live recommendations.';}
+  if(q.includes('portal')){if(typeof window.open==='function')window.open('contractor-portal.html','_blank');return 'I opened the Contractor Portal in a new tab.';}
+  if(q.includes('map')||q.includes('worksite')||q.includes('location')){openProjectArea('map');return 'I moved to the detailed worksite map. Select a numbered marker to inspect that contractor.';}
+  if(q.includes('project overview')||q.includes('contractor list')||q==='contractors'||q.includes('show contractors')){openProjectArea('list');return 'I moved to the Project Overview.';}
+  if(q.includes('attention')||q.includes('which contractor')){const ranked=state.contractors.map(c=>{const work=schedule.rows.filter(r=>r.contractor===c.id),worst=work.reduce((a,r)=>!a||r.varDays>a.varDays?r:a,null);return {c,worst};}).filter(x=>x.worst&&x.worst.varDays>0).sort((a,b)=>b.worst.varDays-a.worst.varDays);return ranked.length?`${ranked.length} contractors need schedule attention: ${ranked.map(x=>`${x.c.name} (+${x.worst.varDays} days on ${x.worst.name})`).join('; ')}.`:'No contractors currently have a forecast delay.';}
+  if(q.includes('delay')||q.includes('late')){const late=schedule.rows.filter(r=>r.contractor&&r.varDays>0).sort((a,b)=>b.varDays-a.varDays);return `The project is forecast ${delay} days late, moving practical completion from ${fmt(final.plan)} to ${fmt(final.forecast)}. The largest package delays are ${late.slice(0,3).map(r=>`${r.name} (+${r.varDays} days)`).join(', ')}.`;}
+  if(q.includes('progress')||q.includes('status')){const assigned=schedule.rows.filter(r=>r.contractor),verified=assigned.reduce((n,r)=>n+deliverableSummary(r.id).verified,0),deliverables=assigned.reduce((n,r)=>n+deliverableSummary(r.id).total,0),total=schedule.rows.reduce((n,r)=>n+r.w,0),pct=Math.round(schedule.rows.reduce((n,r)=>n+r.pct*r.w,0)/total);return `${verified} of ${deliverables} measurable deliverables are verified. That produces ${pct}% weighted earned progress; partial quantities and percentage-only claims earn zero. ${schedule.rows.filter(r=>r.status==='delayed').length} packages are delayed and ${schedule.rows.filter(r=>r.status==='atrisk').length} are at risk.`;}
+  if(q.includes('drawing')||q.includes('revision')){const drawings=state.drawings||[],last=drawings.at(-1);return drawings.length?`${drawings.length} live drawing revision${drawings.length===1?' is':'s are'} recorded. The latest is ${last.title}, revision ${last.revision}, issued to ${C(last.contractor).name}.`:'No live drawing revisions have been published yet. Use Update drawing on a contractor card to publish one.';}
+  if(q.includes('instruction')||q.includes('request')){const items=state.outboundInstructions||[];return items.length?`${items.length} direct instruction${items.length===1?' has':'s have'} been sent. ${items.filter(x=>x.status==='Acknowledged'||x.status==='In progress'||x.status==='Completed').length} have a contractor response or status update.`:'No direct instructions have been sent from the Project Overview yet.';}
+  return 'I can answer about project delay, progress, contractors, drawings, reports, or instructions. I can also navigate to the map, Project Overview, Orchestration Agent, or Contractor Portal.';
+}
+function appendAgentMessage(text,role){const box=document.getElementById('agentMessages');box.innerHTML+=`<div class="agent-message ${role}">${esc(text)}</div>`;box.scrollTop=box.scrollHeight;}
+const AGENT_API_KEY='bohio_agent_api_v1';
+function agentApiGet(){try{return JSON.parse(localStorage.getItem(AGENT_API_KEY)||'null');}catch{return null;}}
+function renderAgentApi(){const cfg=agentApiGet(),provider=document.getElementById('agentApiProvider'),model=document.getElementById('agentApiModel'),status=document.getElementById('agentApiStatus');if(cfg?.provider)provider.value=cfg.provider;if(cfg?.model)model.value=cfg.model;status.textContent=cfg?.key?`${cfg.provider==='anthropic'?'Anthropic':'OpenAI'} connected`:'Not connected';status.classList.toggle('connected',Boolean(cfg?.key));}
+function agentProjectContext(){const schedule=consolidate(),final=schedule.ms.at(-1);return `You are the Bohio project assistant. Answer concisely from this demo data. Progress is earned only from complete, verified deliverables; partial quantities and percentage claims earn zero. Data date: ${state.project.dataDate}. Project delay: ${Math.max(0,final.varDays)} days. Contractor packages: ${schedule.rows.filter(r=>r.contractor).map(r=>{const d=deliverableSummary(r.id);return `${C(r.contractor).name}: ${r.name}, ${d.verified}/${d.total} deliverables verified, ${r.varDays} days variance, ${r.status}`;}).join('; ')}. Recent planner and project manager inputs: ${orchestrationInputFeed().slice(0,5).map(x=>`${C(x.contractor).name}: ${x.title} — ${x.body}`).join('; ')}.`;}
+async function askConnectedApi(question,cfg){
+  if(cfg.provider==='anthropic'){
+    const response=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':cfg.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:cfg.model||'claude-sonnet-4-5',max_tokens:700,system:agentProjectContext(),messages:[{role:'user',content:question}]})});
+    const data=await response.json();if(!response.ok)throw new Error(data?.error?.message||'API request failed');return data.content?.map(x=>x.text||'').join('').trim()||'No response returned.';
+  }
+  const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{'content-type':'application/json','authorization':`Bearer ${cfg.key}`},body:JSON.stringify({model:cfg.model||'gpt-5-mini',instructions:agentProjectContext(),input:question})});
+  const data=await response.json();if(!response.ok)throw new Error(data?.error?.message||'API request failed');return data.output_text||data.output?.flatMap(x=>x.content||[]).map(x=>x.text||'').join('').trim()||'No response returned.';
+}
+async function askProjectAgent(question){const q=question.trim();if(!q)return;appendAgentMessage(q,'user');const cfg=agentApiGet();if(!cfg?.key){appendAgentMessage(projectAnswer(q),'bot');return;}appendAgentMessage('Thinking…','bot pending');const pending=document.querySelector('#agentMessages .pending:last-child');try{const answer=await askConnectedApi(q,cfg);if(pending)pending.remove();appendAgentMessage(answer,'bot');}catch(error){if(pending)pending.remove();appendAgentMessage(`API unavailable: ${error.message}. ${projectAnswer(q)}`,'bot');}}
+/* -------- live orchestration agent -------- */
+const CLIENT_PROJECT_HISTORY=[
+  {name:'Harbour East Utilities',type:'marine utilities',delay:31,recovery:16,signal:'Late ductbank access',action:'A second shift was mobilised before downstream road works started.'},
+  {name:'North Port Expansion',type:'port infrastructure',delay:24,recovery:12,signal:'Electrical production below plan',action:'Daily installed-quantity reporting and a night crew recovered the critical interface.'},
+  {name:'Creekside Roads Programme',type:'roads and drainage',delay:18,recovery:9,signal:'Drainage handover constrained paving',action:'A joint handover inspection three days before paving reduced remobilisation.'},
+  {name:'West Basin Logistics Park',type:'industrial civil works',delay:27,recovery:14,signal:'Contractor forecast not refreshed',action:'A 48-hour forecast-response requirement exposed access and labour constraints.'}
+];
+let lastOrchestrationScan=new Date();
+function orchestrationRecommendations(){
+  const schedule=consolidate();
+  return state.contractors.map(c=>{
+    const work=schedule.rows.filter(r=>r.contractor===c.id),worst=work.reduce((a,r)=>!a||r.varDays>a.varDays?r:a,null);
+    if(!worst||!['delayed','atrisk'].includes(worst.status))return null;
+    const portal=state.reports.filter(r=>r.contractor===c.id&&r.date<=state.project.dataDate).sort((a,b)=>a.date.localeCompare(b.date)).at(-1);
+    const site=(SITE_REPORTS[c.id]||[]).filter(r=>r.date<=state.project.dataDate).sort((a,b)=>a.date.localeCompare(b.date)).at(-1);
+    const response=[...(state.outboundInstructions||[]),...(state.clarifications||[])].filter(x=>x.contractor===c.id&&x.reply).sort((a,b)=>(a.ts||'').localeCompare(b.ts||'')).at(-1);
+    const gap=Math.max(0,Math.round(worst.plannedPct-worst.pct)),delivery=deliverableSummary(worst.id),nextDeliverable=delivery.items.find(x=>!x.verified);
+    const pending=(state.outboundInstructions||[]).filter(x=>x.contractor===c.id&&!['Acknowledged','In progress','Completed'].includes(x.status)).sort((a,b)=>(a.ts||'').localeCompare(b.ts||'')).at(-1);
+    const targetDate=iso(addD(state.project.dataDate,worst.status==='delayed'?3:5));
+    const historical=c.id==='voltaic'?CLIENT_PROJECT_HISTORY[1]:c.id==='meridian'?CLIENT_PROJECT_HISTORY[2]:CLIENT_PROJECT_HISTORY[0];
+    const evidence=[`${delivery.verified} of ${delivery.total} deliverables are verified; ${delivery.pending} await verification`,`${Math.max(0,worst.varDays)}-day forecast variance`];
+    if(portal)evidence.push(`contractor evidence received ${fmt(portal.date)}${portal.source?' through '+portal.source:''}`);
+    if(site)evidence.push(`${site.title}: ${site.summary}`);
+    if(response)evidence.push(`latest contractor response: “${response.reply}”`);
+    evidence.push(`${historical.name} recovered ${historical.recovery} days after: ${historical.action}`);
+    const zone=LOC[c.id]?.zone||'the assigned work area';
+    const title=pending?`Escalate acknowledgement · ${pending.title}`:c.kind==='Robot'?`Activate extended fleet shift · ${worst.name}`:`Mobilise measured recovery shift · ${worst.name}`;
+    const detail=pending?`Acknowledge instruction “${pending.title}” within 4 hours. Confirm the accountable site lead, mobilisation time and any access constraint. If no acknowledgement is received, escalate to the contractor project director and hold the next coordination slot.`:nextDeliverable?`${c.kind==='Robot'?'Deploy the assigned fleet':'Mobilise a named crew'} in ${zone} to complete “${nextDeliverable.name}” in full by ${fmt(targetDate)}. Report the measured result against the ${nextDeliverable.measure} target and provide ${nextDeliverable.acceptance}. Partial quantities are tracked but earn no schedule progress.`:`Submit the final signed package acceptance evidence by ${fmt(targetDate)}.`;
+    const target=pending?'Acknowledgement and accountable lead confirmed':nextDeliverable?`${nextDeliverable.name} · ${nextDeliverable.measure} accepted`:'Final package acceptance';
+    const escalation=pending?'Escalate to the contractor project director if still unacknowledged after four hours.':`Escalate at the next daily review if the full deliverable and acceptance evidence are not submitted; do not report partial work as progress.`;
+    return {contractor:c.id,title,detail,package:worst.name,delay:Math.max(0,worst.varDays),gap,evidence,status:worst.status,target,responseBy:'Within 4 hours',nextReview:'18:00 daily',escalation,actionLabel:pending?'Prepare follow-up':'Review and send now',confidence:evidence.length>=4?'High':'Medium',pending:!!pending};
+  }).filter(Boolean).sort((a,b)=>b.delay-a.delay||b.gap-a.gap);
+}
+function orchestrationInsights(){
+  const schedule=consolidate(),final=schedule.ms.at(-1),recs=orchestrationRecommendations();
+  const historicalMedian=[...CLIENT_PROJECT_HISTORY].map(x=>x.delay).sort((a,b)=>a-b).slice(1,3).reduce((a,b)=>a+b,0)/2;
+  const worst=recs[0],outstanding=(state.outboundInstructions||[]).filter(x=>!['Acknowledged','In progress','Completed'].includes(x.status));
+  const latest=orchestrationInputFeed()[0],similar=worst?.package.toLowerCase().includes('electrical')?CLIENT_PROJECT_HISTORY[1]:worst?.package.toLowerCase().includes('road')?CLIENT_PROJECT_HISTORY[2]:CLIENT_PROJECT_HISTORY[0];
+  const items=[{
+    level:Math.max(0,final.varDays)>historicalMedian?'critical':'watch',label:'PORTFOLIO COMPARISON',
+    title:`Current completion variance is ${Math.max(0,final.varDays)} days`,
+    body:`The median final delay across ${CLIENT_PROJECT_HISTORY.length} comparable client projects was ${historicalMedian} days. ${Math.max(0,final.varDays)>historicalMedian?'The current forecast is outside the previous-project range and needs an active recovery decision.':'The current forecast remains within the previous-project range, but the critical interfaces still need monitoring.'}`
+  }];
+  if(worst)items.push({level:'action',label:'HISTORICAL RECOVERY PATTERN',title:`${C(worst.contractor).name}: act before the next interface`,body:`${similar.name} showed the same pattern: ${similar.signal}. ${similar.action} That project recovered ${similar.recovery} days; apply the prepared instruction now and require a revised forecast through the portal.`});
+  items.push({level:outstanding.length?'watch':'clear',label:'RESPONSE CONTROL',title:outstanding.length?`${outstanding.length} instruction${outstanding.length===1?' is':'s are'} awaiting acknowledgement`:'All issued instructions are acknowledged',body:outstanding.length?'Previous client projects recovered faster when contractors acknowledged instructions and confirmed labour, access and production within one reporting cycle.':'The acknowledgement trail is complete, so the agent will focus on progress variance and new project evidence.'});
+  if(latest)items.push({level:'new',label:'LATEST INPUT ANALYSED',title:`${C(latest.contractor).name} · ${latest.title}`,body:`The agent has incorporated this ${latest.type.toLowerCase()} into the schedule comparison and regenerated the instruction priorities.`});
+  return items;
+}
+function orchestrationInputFeed(){
+  const items=[];
+  ;(state.whatsappUpdates||[]).forEach(x=>items.push({ts:x.ts,type:`Planner/PM · WhatsApp ${x.mediaType||'message'}`,contractor:x.contractor,reporterRole:x.reporterRole||'Planner / Project Manager',title:x.title||'Project update',body:`${x.summary} ${x.scheduleStatus||''}`.trim(),tone:'whatsapp',mediaType:x.mediaType||'message',mediaUrl:x.mediaUrl||'',mediaContentType:x.mediaContentType||'',fileData:x.mediaType==='photo'?x.mediaUrl||'':'',fileName:x.mediaFileName||'',transcript:x.transcript||'',transcriptionStatus:x.transcriptionStatus||'',imageAnalysis:x.imageAnalysis||'',imageAnalysisStatus:x.imageAnalysisStatus||'',mediaStatus:x.mediaStatus||'',syncId:x.syncId||''}));
+  ;(state.inputDocuments||[]).forEach(x=>items.push({ts:x.ts,type:x.mode==='scan'?'Scanned report':'PDF report',contractor:x.contractor,title:x.title,body:`${x.fileName} · document indexed and included in agent analysis.`,tone:'document',fileData:x.fileData,fileName:x.fileName}));
+  state.reports.filter(r=>r.source).forEach(r=>items.push({ts:r.date,type:'Progress report',contractor:r.contractor,title:`${r.lines.length} activity update${r.lines.length===1?'':'s'} received`,body:`Accepted from ${r.source}; ${r.syncStatus||'queued for Primavera P6 sync'}.`,tone:'report'}));
+  ;[...(state.outboundInstructions||[]),...(state.clarifications||[])].filter(x=>x.reply).forEach(x=>items.push({ts:x.ts||state.project.dataDate,type:'Contractor reply',contractor:x.contractor,title:x.title||x.message||'Response received',body:`${x.reply} Agent has included this response in the current recommendation.`,tone:'reply'}));
+  ;(state.drawings||[]).forEach(x=>items.push({ts:x.ts,type:'Drawing update',contractor:x.contractor,title:`${x.title} · ${x.revision}`,body:'Live revision is available to the contractor and included in instruction context.',tone:'drawing'}));
+  Object.entries(SITE_REPORTS).forEach(([contractor,reports])=>reports.slice(0,1).forEach(r=>items.push({ts:r.date,type:'Site report',contractor,title:r.title,body:r.summary,tone:'site',fileData:`reports/client-site-reports.pdf#page=${SITE_REPORT_PAGES[contractor]}`,fileName:`${contractor}-site-report.pdf`})));
+  return items.sort((a,b)=>(b.ts||'').localeCompare(a.ts||'')).slice(0,8);
+}
+function evidenceReceiptTime(ts){
+  const value=new Date(ts||'');
+  if(Number.isNaN(value.getTime()))return '';
+  return value.toLocaleString([],{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+let scheduleOpenTask='duct';
+function scheduleEvidence(taskId,deliverableId){return (state.whatsappUpdates||[]).filter(x=>x.taskId===taskId&&(!deliverableId||x.deliverableId===deliverableId)).sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));}
+function scheduleEvidenceHtml(item){
+  const kind=item.mediaType==='photo'?'Photograph':item.mediaType==='voice'?'Voice note':'WhatsApp message',claim=(state.deliverableClaims||[]).find(x=>x.sourceEventId===item.id),status=claim?.status||item.claimStatus||'Logged';
+  return `<article class="schedule-evidence ${esc(item.mediaType||'message')}"><div class="schedule-evidence-head"><span>${esc(kind)}</span><time>${esc(evidenceReceiptTime(item.ts))}</time></div><small class="schedule-evidence-reporter">Reported by ${esc(item.reporterRole||'Planner / Project Manager')} · affects ${esc(C(item.contractor).name)}</small><p>${esc(item.summary||item.text||'Project evidence received')}</p>${item.mediaType==='photo'&&item.mediaUrl?`<button class="evidence-preview" type="button" data-source="${esc(item.mediaUrl)}" data-title="${esc(item.deliverableName||item.title||'Site photograph')}" onclick="previewReport(this.dataset.source,this.dataset.title)">View photograph</button>`:''}${item.mediaType==='voice'&&item.mediaUrl?`<audio class="whatsapp-audio" controls preload="metadata" src="${esc(item.mediaUrl)}"></audio>`:''}${item.transcript?`<blockquote><b>Transcript</b>${esc(item.transcript)}</blockquote>`:''}${item.imageAnalysis?`<blockquote><b>Agent interpretation</b>${esc(item.imageAnalysis)}</blockquote>`:''}<footer><span>${esc(status)}</span>${item.syncId?`<strong>Primavera · ${esc(item.syncId)}</strong>`:'<strong>Schedule unchanged</strong>'}</footer></article>`;
+}
+window.openScheduleTask=function(taskId){scheduleOpenTask=scheduleOpenTask===taskId?'':taskId;renderSchedule();requestAnimationFrame(()=>document.getElementById('schedule-task-'+taskId)?.scrollIntoView({behavior:'smooth',block:'nearest'}));};
+function renderSchedule(){
+  const host=document.getElementById('scheduleRows');if(!host)return;
+  const schedule=consolidate(),query=(document.getElementById('scheduleSearch')?.value||'').trim().toLowerCase(),filter=document.getElementById('scheduleStatus')?.value||'all';
+  const total=(state.deliverables||[]).length,verified=(state.deliverables||[]).filter(x=>x.status==='Verified'&&x.verifiedDate<=state.project.dataDate).length,pending=(state.deliverableClaims||[]).filter(x=>x.status==='Pending verification').length,evidence=(state.whatsappUpdates||[]).filter(x=>x.mediaUrl||x.summary).length,final=schedule.ms.at(-1);
+  document.getElementById('scheduleKpis').innerHTML=`<article><span>Data date</span><strong>${fmt(state.project.dataDate)}</strong><small>Latest Primavera pull</small></article><article><span>Activities</span><strong>${schedule.rows.length}</strong><small>${schedule.rows.filter(x=>x.status==='done').length} complete</small></article><article><span>Deliverables</span><strong>${verified} / ${total}</strong><small>${pending} awaiting verification</small></article><article><span>WhatsApp evidence</span><strong>${evidence}</strong><small>Messages, photos and voice notes</small></article><article class="${final.varDays>0?'delay':''}"><span>Completion forecast</span><strong>${fmt(final.forecast)}</strong><small>${Math.max(0,final.varDays)} days variance</small></article>`;
+  const integration=state.integrations.find(x=>x.id==='p6');document.getElementById('scheduleSyncTime').textContent=integration?.last?`Last pull ${evidenceReceiptTime(integration.last)}`:'Connected to Primavera P6';
+  const start=D(state.tasks[0].ps),end=D(state.tasks.at(-1).pe),span=Math.max(1,days(start,end));
+  const rows=schedule.rows.filter(row=>{const names=[row.name,C(row.contractor).name,...taskDeliverables(row.id).map(x=>x.name)].join(' ').toLowerCase();return(!query||names.includes(query))&&(filter==='all'||row.status===filter);});
+  host.innerHTML=rows.length?rows.map((row,index)=>{
+    const delivery=deliverableSummary(row.id),open=scheduleOpenTask===row.id,left=clamp(days(start,D(row.ps))/span*100,0,100),width=clamp(days(D(row.ps),D(row.pe))/span*100,2,100-left),allEvidence=scheduleEvidence(row.id),unmatched=allEvidence.filter(x=>!x.deliverableId);
+    return `<article class="schedule-activity ${open?'open':''}" id="schedule-task-${row.id}"><button class="schedule-activity-summary" type="button" onclick="openScheduleTask('${row.id}')" aria-expanded="${open}"><span class="schedule-index">${String(index+1).padStart(2,'0')}</span><span class="schedule-name"><b>${esc(row.name)}</b><small>${esc(row.contractor?C(row.contractor).name:'Unassigned package')} · ${delivery.verified}/${delivery.total} deliverables verified</small></span><span class="schedule-dates"><b>${fmt(row.ps)} → ${fmt(row.pe)}</b><small>Forecast ${fmt(row.forecast)} · ${row.varDays>0?'+'+row.varDays+' days':'on plan'}</small></span><span class="schedule-track"><i style="left:${left}%;width:${width}%"><em style="width:${delivery.earned}%"></em></i></span><span class="schedule-status ${row.status}">${row.status==='done'?'Complete':row.status==='atrisk'?'At risk':row.status==='notstarted'?'Not started':row.status==='tender'?'Unassigned':row.status}</span><span class="schedule-chevron">${open?'−':'+'}</span></button>${open?`<div class="schedule-activity-detail"><div class="schedule-detail-heading"><div><span>MEASURABLE DELIVERABLES</span><h2>${esc(row.name)}</h2></div><div><strong>${delivery.earned}% earned</strong><small>Only fully verified deliverables earn progress</small></div></div><div class="schedule-deliverables">${delivery.items.map(d=>{const claim=(state.deliverableClaims||[]).find(x=>x.deliverableId===d.id&&['Pending verification','Incomplete'].includes(x.status)),items=scheduleEvidence(row.id,d.id),dstatus=d.verified?'Verified':claim?.status||'Not submitted';return `<section class="schedule-deliverable ${d.verified?'verified':claim?'pending':''}"><header><span class="deliverable-number">${d.verified?'✓':d.sequence}</span><div><h3>${esc(d.name)}</h3><p>Target: ${esc(d.measure)} · Accept with ${esc(d.acceptance)}</p></div><strong>${esc(dstatus)}</strong></header>${claim?`<div class="schedule-claim"><span>Latest claim</span><b>${esc(claim.actualQuantity||'Quantity not stated')}</b><p>${esc(claim.evidence||claim.reviewNote)}</p>${claim.status==='Pending verification'?`<button class="btn sm" onclick="verifyDeliverableClaim('${claim.id}',true)">Verify & sync Primavera</button>`:''}</div>`:''}<div class="schedule-evidence-list">${items.length?items.map(scheduleEvidenceHtml).join(''):'<p class="schedule-no-evidence">No WhatsApp evidence attached to this deliverable.</p>'}</div></section>`;}).join('')}</div>${unmatched.length?`<section class="schedule-unmatched"><span>ACTIVITY-LEVEL EVIDENCE · NEEDS DELIVERABLE MATCH</span>${unmatched.map(scheduleEvidenceHtml).join('')}</section>`:''}</div>`:''}</article>`;
+  }).join(''):'<div class="schedule-empty">No Primavera activities match these filters.</div>';
+}
+function renderOrchestrationAgent(){
+  state.inputDocuments=state.inputDocuments||[];
+  const recs=orchestrationRecommendations(),inputs=orchestrationInputFeed(),insights=orchestrationInsights();
+  const replies=[...(state.outboundInstructions||[]),...(state.clarifications||[])].filter(x=>x.reply).length;
+  document.getElementById('orchestrationMonitorStatus').textContent=`${inputs.length} inputs monitored · last analysis ${lastOrchestrationScan.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
+  document.getElementById('orchestrationInsights').innerHTML=insights.map(x=>`<article class="orchestration-insight ${x.level}"><span>${esc(x.label)}</span><h3>${esc(x.title)}</h3><p>${esc(x.body)}</p></article>`).join('');
+  document.getElementById('orchestrationRecommendations').innerHTML=recs.length?recs.map((r,i)=>`<article class="recommendation-card ${r.pending?'pending-response':''}"><div class="recommendation-rank">${i+1}</div><div class="recommendation-copy"><div class="recommendation-meta"><span class="recommendation-severity ${r.status}">${r.pending?'ACKNOWLEDGEMENT REQUIRED':r.status==='delayed'?'SEND NOW · DELAY RECOVERY':'ACT TODAY · AT RISK'}</span><span>${esc(C(r.contractor).name)} · ${esc(r.package)}</span><span class="recommendation-confidence">${esc(r.confidence)} confidence</span></div><h3>${esc(r.title)}</h3><div class="recommendation-brief"><div><span>Required result</span><b>${esc(r.target)}</b></div><div><span>Contractor response</span><b>${esc(r.responseBy)}</b></div><div><span>Agent review</span><b>${esc(r.nextReview)}</b></div></div><p class="recommendation-instruction">${esc(r.detail)}</p><p class="recommendation-escalation"><b>Escalation:</b> ${esc(r.escalation)}</p><details><summary>Evidence and previous-project precedent</summary><ul>${r.evidence.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><p>The agent recalculates this action whenever portal progress, an acknowledgement, a reply, a drawing or a Primavera update arrives.</p></details><button class="btn sm" onclick="prepareOrchestrationInstruction(${i})">${esc(r.actionLabel)}</button></div></article>`).join(''):`<div class="orchestration-empty">No recovery instruction is needed from the current schedule and project inputs.</div>`;
+  document.getElementById('orchestrationInputCount').textContent=`${inputs.length} latest inputs`;
+  document.getElementById('orchestrationTabCount').textContent=inputs.length?`(${inputs.length})`:'';
+  document.getElementById('orchestrationInputs').innerHTML=inputs.length?inputs.map(x=>`<article class="orchestration-input ${x.tone}"><div class="input-source"><span>${esc(x.type)}</span><time>${fmt((x.ts||state.project.dataDate).slice(0,10))}</time></div>${x.mediaUrl?`<div class="evidence-receipt"><span>Evidence uploaded</span><strong>${esc(evidenceReceiptTime(x.ts))}</strong><small>${esc(x.mediaType==='photo'?'Site photograph':x.mediaType==='voice'?'Voice note':'Media file')} · reported by ${esc(x.reporterRole||'Planner / Project Manager')} · ${esc(x.mediaStatus||'Stored in Bohio')}</small></div>`:''}<h3>${esc(C(x.contractor).name)}</h3><b>${esc(x.title)}</b><p>${esc(x.body)}</p>${x.transcript?`<div class="media-analysis"><span>VOICE TRANSCRIPT · ${esc(x.transcriptionStatus||'Transcribed')}</span><p>${esc(x.transcript)}</p></div>`:''}${x.imageAnalysis?`<div class="media-analysis"><span>IMAGE FINDINGS · ${esc(x.imageAnalysisStatus||'Interpreted')}</span><p>${esc(x.imageAnalysis)}</p></div>`:''}${x.mediaType==='voice'&&x.mediaUrl?`<audio class="whatsapp-audio" controls preload="metadata" src="${esc(x.mediaUrl)}"></audio>`:''}${x.fileData?`<button type="button" class="input-document-link" data-source="${esc(x.fileData)}" data-title="${esc(x.title)}" onclick="previewReport(this.dataset.source,this.dataset.title)">${(x.fileName||'').toLowerCase().endsWith('.pdf')||x.fileData.startsWith('data:application/pdf')?'Preview PDF':x.mediaType==='photo'?'View uploaded photograph':'Preview scanned report'} ↗</button>`:''}${x.mediaStatus?`<small class="media-vault-status">${esc(x.mediaStatus)}${x.syncId?' · Evidence linked to '+esc(x.syncId):''}</small>`:''}</article>`).join(''):'<div class="orchestration-empty">No project inputs received.</div>';
+  renderWhatsAppProgressTimeline();
+  const whatsappTarget=document.getElementById('whatsappScheduleTarget');if(whatsappTarget)whatsappTarget.value=state.whatsappScheduleTarget||'Oracle Primavera P6';
+  const latestDocument=state.inputDocuments.at(-1);document.getElementById('reportIntakeStatus').textContent=latestDocument?`${latestDocument.mode==='scan'?'Scan':'PDF'} indexed · ${latestDocument.fileName}`:'Ready for a PDF or scanner input';
+}
+function renderWhatsAppProgressTimeline(){
+  const host=document.getElementById('whatsappProgressTimeline'),status=document.getElementById('whatsappTimelineStatus');if(!host||!status)return;
+  const update=(state.whatsappUpdates||[])[0];
+  if(!update){host.innerHTML='<div class="whatsapp-timeline-empty">Send a completed deliverable, measured quantity and evidence through WhatsApp. Partial work is logged without earning progress.</div>';status.textContent='Waiting for a deliverable claim';return;}
+  const task=state.tasks.find(t=>t.id===update.taskId),claim=(state.deliverableClaims||[]).find(x=>x.id===update.claimId),summary=task?deliverableSummary(task.id):{verified:0,total:0,earned:0},synced=!!update.syncId,matched=!!claim;
+  status.textContent=`Last update ${new Date(update.ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`;
+  host.innerHTML=`<article class="whatsapp-live-update"><div class="whatsapp-update-head"><div><span>${esc(update.reporterRole||'Planner / Project Manager')} · affects ${esc(C(update.contractor).name)} · ${esc(update.mediaType||'message')}</span><h3>${esc(update.deliverableName||task?.name||update.title||'Unmatched update')}</h3></div><b>${summary.verified} / ${summary.total} <i>verified</i></b></div>${update.mediaType==='photo'&&update.mediaUrl?`<button type="button" class="input-document-link" data-source="${esc(update.mediaUrl)}" data-title="WhatsApp evidence · ${esc(update.title||'Site photo')}" onclick="previewReport(this.dataset.source,this.dataset.title)">Preview site image ↗</button>`:''}${update.mediaType==='voice'&&update.mediaUrl?`<audio class="whatsapp-audio" controls preload="metadata" src="${esc(update.mediaUrl)}"></audio>`:''}${update.transcript?`<div class="media-analysis"><span>VOICE TRANSCRIPT</span><p>${esc(update.transcript)}</p></div>`:''}${update.imageAnalysis?`<div class="media-analysis"><span>IMAGE FINDINGS</span><p>${esc(update.imageAnalysis)}</p></div>`:''}<div class="whatsapp-progress-change discrete"><span style="width:${summary.earned}%"></span><i style="width:${summary.earned}%"></i></div><div class="deliverable-gate"><strong>${synced?'DELIVERABLE VERIFIED':matched?'ZERO PROGRESS UNTIL VERIFIED':'PERCENTAGE CLAIM — ZERO EARNED'}</strong><span>${esc(update.scheduleStatus||'Evidence logged')}</span></div><div class="automation-steps"><div class="complete"><b>1</b><span>Planner/PM WhatsApp received<small>${esc(update.mediaStatus||`${update.mediaType||'message'} evidence`)}</small></span></div><div class="${matched?'complete':'held'}"><b>2</b><span>${matched?'Deliverable matched':'Context only'}<small>${esc(update.summary||'Update analysed')}</small></span></div><div class="${claim?.status==='Verified'?'complete':'held'}"><b>3</b><span>${claim?.status==='Verified'?'Acceptance verified':'Verification gate'}<small>${claim?esc(claim.measure+' required · '+claim.status):'Name the completed deliverable and measured result'}</small></span></div><div class="${synced?'complete':'held'}"><b>4</b><span>${synced?'Primavera synchronized':'Primavera unchanged'}<small>${esc(update.syncId||`${summary.earned}% earned progress`)}</small></span></div></div>${claim?.status==='Pending verification'?`<div class="deliverable-review-actions"><button class="btn sm" onclick="verifyDeliverableClaim('${claim.id}',true)">Verify deliverable & sync</button><button class="btn ghost sm" onclick="verifyDeliverableClaim('${claim.id}',false)">Reject evidence</button></div>`:''}</article>`;
+}
+let reportPreviewObjectUrl='';
+window.previewReport=function(source,title='Contractor report'){
+  const dialog=document.getElementById('reportPreviewDialog'),frame=document.getElementById('reportPreviewFrame');
+  try{
+    if(reportPreviewObjectUrl){URL.revokeObjectURL(reportPreviewObjectUrl);reportPreviewObjectUrl='';}
+    let previewUrl=source;
+    if(source.startsWith('data:')){
+      const match=source.match(/^data:(application\/pdf|image\/(?:png|jpeg|webp|gif));base64,([\s\S]+)$/);
+      if(!match)throw new Error('Unsupported document format');
+      const bytes=Uint8Array.from(atob(match[2]),c=>c.charCodeAt(0));
+      reportPreviewObjectUrl=URL.createObjectURL(new Blob([bytes],{type:match[1]}));previewUrl=reportPreviewObjectUrl;
+    }
+    document.getElementById('reportPreviewTitle').textContent=title;frame.src=previewUrl;
+    if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');
+  }catch(error){toast('Unable to preview this report: '+error.message);}
+};
+window.closeReportPreview=function(){const dialog=document.getElementById('reportPreviewDialog'),frame=document.getElementById('reportPreviewFrame');frame.src='about:blank';if(typeof dialog.close==='function')dialog.close();else dialog.removeAttribute('open');if(reportPreviewObjectUrl){URL.revokeObjectURL(reportPreviewObjectUrl);reportPreviewObjectUrl='';}};
+document.getElementById('reportPreviewClose').onclick=closeReportPreview;
+document.getElementById('reportPreviewDialog').addEventListener('click',event=>{if(event.target===event.currentTarget)closeReportPreview();});
+window.importContractorReport=async function(input,mode){
+  const file=input.files?.[0];if(!file)return;
+  const isPdf=file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf'),isImage=file.type.startsWith('image/');
+  if(mode==='upload'&&!isPdf){toast('Choose a PDF report');input.value='';return;}
+  if(!isPdf&&!isImage){toast('Choose a PDF or scanned image');input.value='';return;}
+  if(file.size>4*1024*1024){toast('Choose a report smaller than 4 MB');input.value='';return;}
+  const contractor=document.getElementById('reportContractor').value,title=document.getElementById('reportTitle').value.trim()||file.name.replace(/\.[^.]+$/,'');
+  document.getElementById('reportIntakeStatus').textContent=mode==='scan'?'Reading scanner output…':'Uploading and indexing PDF…';
+  const fileData=await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>resolve('');reader.readAsDataURL(file);});
+  if(!fileData){toast('The report could not be read');return;}
+  state.inputDocuments=state.inputDocuments||[];state.inputDocuments.push({id:'doc'+Date.now(),contractor,title,fileName:file.name,fileData,mode,ts:state.project.dataDate+'T'+new Date().toTimeString().slice(0,5)});
+  try{localStorage.setItem(STORE,JSON.stringify(state));}catch(error){state.inputDocuments.pop();document.getElementById('reportIntakeStatus').textContent='Report was not saved. Browser storage is full.';toast('Report not saved. Choose a smaller PDF or free browser storage.');input.value='';return;}
+  state.intFeed.unshift({ts:'now',t:`${C(contractor).name} ▸ ${mode==='scan'?'scanned report':'PDF report'} indexed: ${title}`});
+  lastOrchestrationScan=new Date();save();renderOrchestrationAgent();showOrchestrationPanel('inputs');input.value='';document.getElementById('reportTitle').value='';toast(`${mode==='scan'?'Scanned report':'PDF report'} added to agent inputs`);
+};
+window.prepareOrchestrationInstruction=function(index){
+  const rec=orchestrationRecommendations()[index];if(!rec)return;
+  showView('contractors');document.querySelectorAll('.tab[data-view]').forEach(t=>t.classList.toggle('active',t.dataset.view==='contractors'));renderAll();selectMgmt(rec.contractor);
+  document.querySelectorAll('.contractor-action-panel').forEach(x=>x.hidden=true);
+  const form=document.getElementById('instruction-form-'+rec.contractor);form.hidden=false;
+  document.getElementById('instruction-title-'+rec.contractor).value=rec.title;document.getElementById('instruction-detail-'+rec.contractor).value=rec.detail;document.getElementById('instruction-priority-'+rec.contractor).value='high';
+  const card=document.getElementById('contractor-card-'+rec.contractor);card.classList.add('walkthrough-target');card.scrollIntoView({behavior:'smooth',block:'center'});toast(`Agent instruction prepared for ${C(rec.contractor).name}`);
+};
+function orchestrationAnswer(question){
+  const q=question.toLowerCase(),recs=orchestrationRecommendations(),inputs=orchestrationInputFeed();
+  if(q.includes('send')||q.includes('instruction')||q.includes('recommend'))return recs.length?`Send ${recs.length} recovery instruction${recs.length===1?'':'s'}. First priority: ${recs[0].title} to ${C(recs[0].contractor).name}, because ${recs[0].evidence.slice(0,2).join(' and ')}.`:'No recovery instruction is needed from the current evidence.';
+  if(q.includes('input')||q.includes('report')||q.includes('response')||q.includes('reply')){const replies=inputs.filter(x=>x.type==='Contractor reply');return replies.length?`${replies.length} contractor repl${replies.length===1?'y needs':'ies need'} review. The latest from ${C(replies[0].contractor).name} says: ${replies[0].body}`:`There are no unanswered contractor replies in the current demo. ${inputs.length} recent reports and drawing updates are already included in the recommendations.`;}
+  return projectAnswer(question);
+}
+function appendOrchestrationMessage(text,role){const box=document.getElementById('orchestrationMessages');box.innerHTML+=`<div class="orchestration-message ${role}">${esc(text)}</div>`;box.scrollTop=box.scrollHeight;}
+function askOrchestrationAgent(question){const q=question.trim();if(!q)return;appendOrchestrationMessage(q,'user');appendOrchestrationMessage(orchestrationAnswer(q),'bot');}
+window.showOrchestrationPanel=function(panel){
+  document.querySelectorAll('.orchestration-subnav [data-orchestration-panel]').forEach(button=>{const active=button.dataset.orchestrationPanel===panel;button.classList.toggle('active',active);button.setAttribute('aria-selected',String(active));});
+  for(const name of ['instructions','inputs']){const section=document.getElementById('orchestration-panel-'+name),active=name===panel;section.classList.toggle('active',active);section.hidden=!active;}
+};
+function monitorOrchestration(){
+  const changed=receivePortal();lastOrchestrationScan=new Date();
+  if(cur==='orchestration'){if(changed)save();renderOrchestrationAgent();}
+  setTimeout(monitorOrchestration,6000);
+}
+/* -------- orchestration -------- */
+let cur='contractors';
+function renderAll(){
+  renderHeader();
+  renderRoster();renderManagement();
+  renderSchedule();renderOrchestrationAgent();renderIntegrations();renderAnth();
+}
+function showView(id){
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  cur=id;window.scrollTo(0,0);
+}
+document.querySelectorAll('.tab[data-view]').forEach(tab=>tab.onclick=()=>{
+  document.querySelectorAll('.tab[data-view]').forEach(x=>x.classList.remove('active'));
+  tab.classList.add('active');showView(tab.dataset.view);
+});
+document.getElementById('dataDate').onchange=e=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)){e.target.value=state.project.dataDate;toast('Choose a valid data date');return;}state.project.dataDate=e.target.value;save();renderAll();};
+document.getElementById('btnToday').onclick=()=>{const now=new Date(),pad=n=>String(n).padStart(2,'0');state.project.dataDate=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;save();renderAll();toast(`Data date moved to today · ${fmt(state.project.dataDate)}`);};
+document.getElementById('scheduleSearch').oninput=renderSchedule;
+document.getElementById('scheduleStatus').onchange=renderSchedule;
+document.getElementById('mondayTest').onclick=testMondayConnection;
+document.getElementById('menuToggle').onclick=()=>{const closed=document.body.classList.toggle('menu-closed');document.getElementById('menuToggle').setAttribute('aria-expanded',String(!closed));document.getElementById('menuToggle').setAttribute('aria-label',closed?'Open menu':'Close menu');document.getElementById('projectTabs').hidden=closed;};
+
+
+document.getElementById('anthSave').onclick=()=>{
+  const key=document.getElementById('anthKey').value.trim(),model=document.getElementById('anthModel').value;
+  try{if(key)localStorage.setItem(ANTH_KEY,key);localStorage.setItem(ANTH_MODEL,model);}catch(e){}
+  document.getElementById('anthKey').value='';renderAnth();
+  toast(key?('Demo configuration saved · '+anthModelLabel(model)):'Model saved');
+};
+document.getElementById('anthClear').onclick=()=>{try{localStorage.removeItem(ANTH_KEY);}catch(e){}document.getElementById('anthKey').value='';renderAnth();toast('API key removed');};
+document.getElementById('projectAgentToggle').onclick=()=>{const panel=document.getElementById('projectAgent'),open=panel.hidden;panel.hidden=!open;document.getElementById('projectAgentToggle').setAttribute('aria-expanded',String(open));if(open)document.getElementById('agentInput').focus();};
+document.getElementById('projectAgentClose').onclick=()=>document.getElementById('projectAgentToggle').click();
+document.getElementById('agentForm').onsubmit=e=>{e.preventDefault();const input=document.getElementById('agentInput'),q=input.value;input.value='';askProjectAgent(q);};
+document.getElementById('agentInput').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();document.getElementById('agentForm').requestSubmit();}};
+document.getElementById('agentApiProvider').onchange=e=>{document.getElementById('agentApiModel').value=e.target.value==='anthropic'?'claude-sonnet-4-5':'gpt-5-mini';};
+document.getElementById('agentApiSave').onclick=()=>{const provider=document.getElementById('agentApiProvider').value,model=document.getElementById('agentApiModel').value.trim(),key=document.getElementById('agentApiKey').value.trim();if(!key){toast('Paste an API key');return;}try{localStorage.setItem(AGENT_API_KEY,JSON.stringify({provider,model,key}));}catch{}document.getElementById('agentApiKey').value='';renderAgentApi();toast('AI API saved');};
+renderAgentApi();
+document.querySelectorAll('[data-orchestration-question]').forEach(b=>b.onclick=()=>askOrchestrationAgent(b.dataset.orchestrationQuestion));
+document.querySelectorAll('.orchestration-subnav [data-orchestration-panel]').forEach(b=>b.onclick=()=>showOrchestrationPanel(b.dataset.orchestrationPanel));
+let tT;function toast(m){const e=document.getElementById('toast');e.textContent=m;e.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>e.classList.remove('show'),2800);}
+
+function readBridge(key){try{const value=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(value)?value:[];}catch{return [];}}
+function registerDeliverableClaim(event,source,date){
+  state.deliverableClaims=state.deliverableClaims||[];
+  if(state.deliverableClaims.some(x=>x.sourceEventId===event.id))return state.deliverableClaims.find(x=>x.sourceEventId===event.id);
+  const deliverable=(state.deliverables||[]).find(x=>x.id===event.deliverableId&&x.taskId===event.taskId),task=state.tasks.find(x=>x.id===event.taskId);
+  if(!deliverable||!task)return null;
+  const actualValue=Number.isFinite(Number(event.actualValue))?Number(event.actualValue):null,targetMet=event.targetMet===true&&actualValue!==null&&actualValue>=Number(deliverable.target);
+  const claim={id:'DCL-'+Date.now()+'-'+Math.random().toString(16).slice(2,7),sourceEventId:event.id,source,contractor:event.contractor,taskId:task.id,taskName:task.name,deliverableId:deliverable.id,deliverableName:deliverable.name,actualValue,actualQuantity:event.actualQuantity||event.measuredValue||'',target:deliverable.target,measure:deliverable.measure,evidence:event.verificationEvidence||event.evidence||'',claimedAt:event.ts||date+'T00:00',status:targetMet?'Pending verification':'Incomplete',reviewNote:targetMet?'Full target claimed; independent verification required before progress is earned.':'Less than the deliverable target; tracked as work in progress with zero earned progress.',syncId:''};
+  state.deliverableClaims.unshift(claim);return claim;
+}
+function receivePortal(){
+  let changed=false;const seen=new Set(state.portalEvents||[]);
+  for(const e of readBridge('bohio_bridge_responses')){
+    if(!e.id||seen.has(e.id))continue;
+    const id=e.instructionId||'';
+    const d=state.directives.find(d=>('Bd:'+d.id===id||e.sourceId==='d:'+d.id)&&d.contractor===e.contractor);
+    const q=state.clarifications.find(q=>'Bq:'+q.id===id&&q.contractor===e.contractor);
+    const outbound=(state.outboundInstructions||[]).find(x=>'Bri:'+x.id===id&&x.contractor===e.contractor);
+    if(d){const status={Acknowledged:'Acknowledged','In progress':'Executing',Completed:'Completed'}[e.status];if(status)d.status=status;if(e.reply)d.reply=e.reply;}
+    if(q){q.status=e.reply?'Responded':e.status;if(e.reply)q.reply=e.reply;}
+    if(outbound){outbound.status=e.status;if(e.reply)outbound.reply=e.reply;}
+    if(d||q||outbound)state.intFeed.unshift({ts:'now',t:C(e.contractor).name+' ▸ '+(e.reply?'Reply: '+e.reply:'Instruction '+e.status)});
+    seen.add(e.id);changed=true;
+  }
+  for(const e of readBridge('bohio_bridge_updates')){
+    if(!e.id||seen.has(e.id))continue;
+    const task=state.tasks.find(t=>(t.id===e.taskId||t.name===e.pkg)&&t.contractor===e.contractor);
+    if(task&&/^\d{4}-\d{2}-\d{2}$/.test(e.date||'')){
+      const claim=registerDeliverableClaim({...e,taskId:task.id},e.source||'Contractor Portal',e.date);
+      if(e.date>state.project.dataDate)state.project.dataDate=e.date;
+      state.intFeed.unshift({ts:'now',t:claim?`${C(e.contractor).name} ▸ ${claim.deliverableName} · ${claim.status} · Primavera unchanged`:`${C(e.contractor).name} ▸ percentage-only update ignored for earned progress`});
+    }
+    seen.add(e.id);changed=true;
+  }
+  if(changed){state.portalEvents=[...seen];save();}return changed;
+}
+function receiveWhatsApp(){
+  let changed=false;const seen=new Set(state.whatsappEvents||[]),requests=readScheduleChanges();
+  for(const event of readBridge(WHATSAPP_UPDATES_KEY)){
+    if(!event.id||seen.has(event.id))continue;
+    const task=state.tasks.find(t=>t.id===event.taskId&&t.contractor===event.contractor),contractor=C(event.contractor),date=/^\d{4}-\d{2}-\d{2}$/.test(event.date||'')?event.date:state.project.dataDate;
+    const before=task?deliverableSummary(task.id).earned:0,claim=task?registerDeliverableClaim(event,'WhatsApp · Bohio AI',date):null;
+    let scheduleStatus=claim?(claim.status==='Pending verification'?`Full deliverable claimed; ${before}% remains until verification`:'Partial deliverable logged; zero progress earned'):'Percentage-only or unmatched update logged as context; zero progress earned',syncId='';
+    if(task&&event.proposedFinish&&/^\d{4}-\d{2}-\d{2}$/.test(event.proposedFinish)){
+      if(!requests.some(x=>x.sourceEventId===event.id))requests.push({id:'SCR-WA-'+Date.now(),sourceEventId:event.id,contractor:event.contractor,taskId:task.id,taskName:task.name,currentStart:task.ps,currentFinish:task.pe,proposedStart:event.proposedStart||task.ps,proposedFinish:event.proposedFinish,reason:event.text||'Schedule change proposed through WhatsApp',requestedAt:(event.ts||date+'T00:00'),status:'Pending planner approval',syncId:''});
+      scheduleStatus='Date change held for planner approval; schedule of record unchanged';
+    }
+    if(event.submissionId){const submission=(state.submissions||[]).find(x=>x.id===event.submissionId&&x.contractor===event.contractor);if(submission&&!submission.submittedAt){submission.submittedAt=date;submission.status='Received through WhatsApp';}}
+    state.whatsappUpdates=state.whatsappUpdates||[];state.whatsappUpdates.unshift({id:event.id,contractor:event.contractor,taskId:event.taskId,mediaType:event.mediaType||'message',mediaUrl:event.mediaUrl||'',mediaContentType:event.mediaContentType||'',mediaFileName:event.mediaFileName||'',mediaStatus:event.mediaStatus||'',transcript:event.transcript||'',transcriptionStatus:event.transcriptionStatus||'',imageAnalysis:event.imageAnalysis||'',imageAnalysisStatus:event.imageAnalysisStatus||'',source:event.source||'Twilio WhatsApp · Planner/PM',reporterRole:event.reporterRole||'Planner / Project Manager',title:event.title||task?.name||'Project update',summary:event.summary||event.text||'Evidence received',scheduleStatus,ts:event.ts||date+'T00:00',syncId,claimId:claim?.id||'',claimStatus:claim?.status||'Unmatched',deliverableId:claim?.deliverableId||event.deliverableId||'',deliverableName:claim?.deliverableName||event.deliverableName||'',earnedBefore:before,earnedAfter:before,legacyPercent:Number.isFinite(Number(event.legacyPercent))?Number(event.legacyPercent):Number.isFinite(Number(event.pct))?Number(event.pct):null});
+    state.intFeed.unshift({ts:'now',t:`Planner/PM WhatsApp ▸ ${contractor.name} · ${event.mediaType||'message'} analysed · ${scheduleStatus}`});
+    seen.add(event.id);changed=true;
+  }
+  if(changed){state.whatsappEvents=[...seen];writeScheduleChanges(requests);save();}return changed;
+}
+async function pollPhoneWhatsApp(){
+  if(typeof fetch!=='function')return;
+  try{
+    const response=await fetch('/api/updates',{headers:{Accept:'application/json'},cache:'no-store'});if(!response.ok)return;
+    const payload=await response.json(),incoming=Array.isArray(payload.updates)?payload.updates:[],local=readBridge(WHATSAPP_UPDATES_KEY),known=new Set(local.map(x=>x.id)),fresh=incoming.filter(x=>x.id&&!known.has(x.id));
+    if(fresh.length){localStorage.setItem(WHATSAPP_UPDATES_KEY,JSON.stringify([...local,...fresh]));if(receiveWhatsApp())renderAll();}
+  }catch{}finally{setTimeout(pollPhoneWhatsApp,3000);}
+}
+window.addEventListener('storage',e=>{if(e.key===AGENT_API_KEY)renderAgentApi();if(e.key===OWNER_CHAT_KEY)refreshOwnerChats();if(e.key===SCHEDULE_CHANGE_KEY)renderAll();if(e.key===WHATSAPP_UPDATES_KEY&&receiveWhatsApp())renderAll();if(['bohio_bridge_responses','bohio_bridge_updates'].includes(e.key)&&receivePortal())renderAll();});
+receivePortal();
+receiveWhatsApp();
+save();
+renderAll();
+pollPhoneWhatsApp();
+setTimeout(monitorOrchestration,6000);
+if(window.location?.hash==='#schedule'){showView('schedule');document.querySelectorAll('.tab[data-view]').forEach(t=>t.classList.toggle('active',t.dataset.view==='schedule'));}
+else if(window.location?.hash==='#orchestration'){showView('orchestration');document.querySelectorAll('.tab[data-view]').forEach(t=>t.classList.toggle('active',t.dataset.view==='orchestration'));}
+else if(window.location?.hash==='#contractors'){showView('contractors');document.querySelectorAll('.tab[data-view]').forEach(t=>t.classList.toggle('active',t.dataset.view==='contractors'));}
+</script>
+<script src="bohio-sync.js?v=monday-two-way"></script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
