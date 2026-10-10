@@ -23,6 +23,10 @@
       "destination": "/schedule.html"
     },
     {
+      "source": "/feasibility",
+      "destination": "/feasibility.html"
+    },
+    {
       "source": "/programme",
       "destination": "/schedule.html"
     }

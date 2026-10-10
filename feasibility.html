@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bohio · Development Feasibility</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#ffffff; --ink:#000919; --ink-soft:rgba(0,9,25,0.55); --ink-faint:rgba(0,9,25,0.30);
+    --ink-hairline:rgba(0,9,25,0.12); --paper:#f6f4f4; --alert:#d6304d; --good:#15803d; --warn:#b45309;
+    --rev:#0f5c8c; --cost:#000919; --debt:#b45309; --equity:#15803d;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--ink);font-family:'Space Grotesk',-apple-system,sans-serif;letter-spacing:.01em;min-height:100vh}
+  ::selection{background:var(--ink);color:var(--bg)}
+  .topbar{position:sticky;top:0;z-index:40;background:var(--bg);border-bottom:1px solid var(--ink-hairline)}
+  .topbar-in{display:flex;align-items:center;gap:22px;padding:14px 26px;max-width:1380px;margin:0 auto;flex-wrap:wrap}
+  .logo{font-size:18px;letter-spacing:.48em;text-transform:uppercase;font-weight:500;color:inherit;text-decoration:none}
+  .logo small{font-size:8.5px;letter-spacing:.3em;color:var(--ink-soft);display:block;margin-top:3px}
+  .scen{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .wrap{max-width:1380px;margin:0 auto;padding:0 26px 120px}
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--ink-hairline);margin:0 -26px 26px;padding:0 26px;position:sticky;top:67px;background:var(--bg);z-index:30;overflow-x:auto}
+  .tab{padding:15px 14px;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:inherit;margin-bottom:-1px;white-space:nowrap}
+  .tab:hover{color:var(--ink)} .tab.active{color:var(--ink);border-bottom-color:var(--ink);font-weight:500}
+  .view{display:none} .view.active{display:block}
+  h2.section{font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:var(--ink-soft);font-weight:500;margin:34px 0 14px;display:flex;align-items:center;gap:14px}
+  h2.section::after{content:"";flex:1;height:1px;background:var(--ink-hairline)}
+  h2.section:first-child{margin-top:6px}
+  .note{font-size:12px;color:var(--ink-soft);line-height:1.55;margin:-4px 0 14px;max-width:820px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));border-top:1px solid var(--ink-hairline);border-left:1px solid var(--ink-hairline)}
+  .kpi{background:var(--bg);padding:16px 18px;border-right:1px solid var(--ink-hairline);border-bottom:1px solid var(--ink-hairline)}
+  .kpi .l{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft)}
+  .kpi .v{font-size:24px;font-weight:500;margin-top:8px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .kpi .s{font-size:11px;color:var(--ink-soft);margin-top:4px}
+  .kpi.good .v{color:var(--good)} .kpi.bad .v{color:var(--alert)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+  @media(max-width:900px){.grid2{grid-template-columns:1fr}}
+  .card{border:1px solid var(--ink-hairline);padding:18px}
+  .btn{font-family:inherit;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;padding:9px 14px;border:1px solid var(--ink);background:var(--ink);color:var(--bg);cursor:pointer;white-space:nowrap}
+  .btn:hover{opacity:.85}
+  .btn.ghost{background:var(--bg);color:var(--ink);border-color:var(--ink-hairline)}
+  .btn.ghost:hover{border-color:var(--ink)}
+  .btn.sm{padding:6px 10px;font-size:9.5px}
+  .btn.x{border:none;background:none;color:var(--ink-faint);font-size:16px;padding:2px 6px;letter-spacing:0}
+  .btn.x:hover{color:var(--alert)}
+  select,input{font-family:inherit;font-size:13px;color:var(--ink);background:var(--bg);border:1px solid var(--ink-hairline);padding:6px 8px;border-radius:0;font-variant-numeric:tabular-nums;min-width:0}
+  input:focus,select:focus{outline:none;border-color:var(--ink)}
+  input[type=number]{text-align:right}
+  .form{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px 22px}
+  .form label{display:flex;flex-direction:column;gap:6px;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft)}
+  .form label input,.form label select{font-size:14px;letter-spacing:.01em;text-transform:none}
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--ink-hairline)}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;font-variant-numeric:tabular-nums}
+  th{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);font-weight:500;text-align:left;padding:10px 8px;border-bottom:1px solid var(--ink-hairline);background:var(--paper);white-space:nowrap}
+  td{padding:5px 8px;border-bottom:1px solid var(--ink-hairline);white-space:nowrap}
+  td.n,th.n{text-align:right}
+  table.edit td{padding:3px 4px}
+  table.edit input,table.edit select{width:100%;border-color:transparent;padding:6px}
+  table.edit input:hover,table.edit select:hover{border-color:var(--ink-hairline)}
+  table.edit input:focus{border-color:var(--ink)}
+  table.edit td.calc{color:var(--ink-soft);text-align:right;padding-right:10px}
+  tr.tot td{font-weight:600;border-top:1px solid var(--ink);background:var(--paper)}
+  tr.sub td{font-weight:500}
+  tr.hd td{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);padding-top:16px}
+  td.neg{color:var(--alert)}
+  .stmt td:first-child{padding-left:12px} .stmt tr.ind td:first-child{padding-left:28px;color:var(--ink-soft)}
+  .cf td:first-child,.cf th:first-child{position:sticky;left:0;background:var(--bg);z-index:1;min-width:220px;border-right:1px solid var(--ink-hairline)}
+  .cf th:first-child{background:var(--paper)} .cf tr.tot td:first-child{background:var(--paper)}
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  .spacer{flex:1}
+  .seg{display:inline-flex;border:1px solid var(--ink-hairline)}
+  .seg button{font-family:inherit;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;padding:7px 12px;border:none;background:none;cursor:pointer;color:var(--ink-soft)}
+  .seg button.on{background:var(--ink);color:var(--bg)}
+  .chart{width:100%;display:block}
+  .chart text{font-family:'Space Grotesk',sans-serif;fill:var(--ink-soft);font-size:10px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--ink-soft);margin-top:8px}
+  .legend i{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px}
+  .heat td{text-align:center;padding:9px 6px;width:15%}
+  .heat th:first-child{width:180px}
+  .heat td.base{outline:2px solid var(--ink);outline-offset:-2px;font-weight:600}
+  .warn{border-left:3px solid var(--alert);background:rgba(214,48,77,.06);padding:10px 14px;font-size:12.5px;margin-bottom:16px;display:none}
+  .warn.show{display:block}
+  .tor{display:grid;grid-template-columns:200px 1fr;gap:8px 14px;align-items:center;font-size:12px}
+  .tor .bar{position:relative;height:22px;background:var(--paper)}
+  .tor .bar span{position:absolute;top:0;bottom:0;display:flex;align-items:center;font-size:10px;color:#fff;padding:0 6px;white-space:nowrap}
+  .tor .mid{position:absolute;top:-4px;bottom:-4px;width:1px;background:var(--ink)}
+  .big{font-size:34px;font-weight:500;font-variant-numeric:tabular-nums}
+  .muted{color:var(--ink-soft)}
+  @media print{.topbar,.tabs,.toolbar,.btn,.scen{display:none!important}.view{display:block!important;page-break-after:always}.wrap{padding:0}}
+  @media(max-width:600px){.wrap{padding:0 16px 80px}.tabs{margin:0 -16px 20px;padding:0 16px}.topbar-in{padding:12px 16px}}
+</style>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="logo" href="index.html">Bohio<small>Development Feasibility</small></a>
+  <div class="scen">
+    <select id="scenSel" title="Saved scenarios"></select>
+    <button class="btn ghost sm" id="btnSave">Save</button>
+    <button class="btn ghost sm" id="btnSaveAs">Save as…</button>
+    <button class="btn ghost sm" id="btnDel">Delete</button>
+    <button class="btn ghost sm" id="btnExport">Export JSON</button>
+    <label class="btn ghost sm" style="cursor:pointer">Import<input type="file" id="fileImport" accept=".json" hidden></label>
+    <button class="btn ghost sm" id="btnReset">Example</button>
+    <button class="btn sm" onclick="window.print()">Print report</button>
+  </div>
+</div></header>
+
+<div class="wrap">
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-v="summary">Summary</button>
+    <button class="tab" data-v="project">Project</button>
+    <button class="tab" data-v="revenue">Revenue</button>
+    <button class="tab" data-v="costs">Costs</button>
+    <button class="tab" data-v="finance">Finance</button>
+    <button class="tab" data-v="cashflow">Cash Flow</button>
+    <button class="tab" data-v="sensitivity">Sensitivity</button>
+    <button class="tab" data-v="residual">Residual Land</button>
+  </nav>
+
+  <div class="warn" id="warn"></div>
+
+  <!-- SUMMARY -->
+  <section class="view active" id="v-summary">
+    <h2 class="section" id="sumTitle">Feasibility summary</h2>
+    <div class="kpis" id="kpis"></div>
+    <div class="grid2" style="margin-top:26px">
+      <div>
+        <h2 class="section">Development statement</h2>
+        <div class="tbl-wrap"><table class="stmt" id="stmt"></table></div>
+      </div>
+      <div>
+        <h2 class="section">Cumulative cash flow &amp; funding</h2>
+        <div class="card"><svg class="chart" id="chCum" viewBox="0 0 640 300"></svg>
+          <div class="legend"><span><i style="background:var(--rev)"></i>Revenue</span><span><i style="background:var(--cost)"></i>Costs</span><span><i style="background:var(--debt)"></i>Debt balance</span><span><i style="background:var(--alert)"></i>Cumulative net (pre-finance)</span></div>
+        </div>
+        <h2 class="section">Cost breakdown</h2>
+        <div class="card" id="costBars"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROJECT -->
+  <section class="view" id="v-project">
+    <h2 class="section">Project details</h2>
+    <div class="form" id="fProject"></div>
+    <h2 class="section">Land acquisition</h2>
+    <p class="note">Purchase price is paid as a deposit at the deposit month and the balance at settlement. Transfer tax, legal and brokerage are entered as cost lines on the Costs tab using the “% of land” basis.</p>
+    <div class="form" id="fLand"></div>
+    <h2 class="section">Performance targets &amp; escalation</h2>
+    <div class="form" id="fTargets"></div>
+  </section>
+
+  <!-- REVENUE -->
+  <section class="view" id="v-revenue">
+    <h2 class="section">Sales revenue</h2>
+    <p class="note">Sale price per unit = area × rate. Settlements are spread from the start month over the span. Revenue escalation (Project tab) is applied from month 0.</p>
+    <div class="tbl-wrap"><table class="edit" id="tSales"></table></div>
+    <div class="toolbar" style="margin-top:10px"><button class="btn ghost sm" id="addSale">+ Add sales line</button></div>
+    <h2 class="section">Leased / investment revenue</h2>
+    <p class="note">Net rent is received from the lease start month until the sale month, when the asset is sold at net rent ÷ capitalisation rate, less purchaser’s costs.</p>
+    <div class="tbl-wrap"><table class="edit" id="tLeases"></table></div>
+    <div class="toolbar" style="margin-top:10px"><button class="btn ghost sm" id="addLease">+ Add lease line</button></div>
+    <h2 class="section">Revenue summary</h2>
+    <div class="kpis" id="revKpis"></div>
+  </section>
+
+  <!-- COSTS -->
+  <section class="view" id="v-costs">
+    <h2 class="section">Development costs</h2>
+    <p class="note">Basis options: <b>Lump sum</b>; <b>Qty × rate</b>; <b>% of construction</b> (all lump-sum and rate lines in the Construction category); <b>% of land</b>; <b>% of GRV</b>, spread over the timing you set; <b>% of revenue</b>, paid as revenue comes in, for sales commission. S-curve uses a smooth bell-shaped spend profile.</p>
+    <div class="tbl-wrap"><table class="edit" id="tCosts"></table></div>
+    <div class="toolbar" style="margin-top:10px"><button class="btn ghost sm" id="addCost">+ Add cost line</button></div>
+  </section>
+
+  <!-- FINANCE -->
+  <section class="view" id="v-finance">
+    <h2 class="section">Funding structure</h2>
+    <p class="note">Costs are funded in the order equity → mezzanine → senior debt. Interest is calculated monthly on the opening balance and capitalised. Revenue repays senior debt first, then mezzanine, then returns equity and profit. The senior limit is set as a share of total development cost, including finance, and is solved iteratively. Any shortfall beyond all facilities is flagged and funded as extra equity.</p>
+    <div class="form" id="fFinance"></div>
+    <h2 class="section">Funding results</h2>
+    <div class="kpis" id="finKpis"></div>
+    <h2 class="section">Facility balances</h2>
+    <div class="card" style="max-width:900px"><svg class="chart" id="chDebt" viewBox="0 0 640 260"></svg>
+      <div class="legend"><span><i style="background:var(--equity)"></i>Equity in</span><span><i style="background:var(--warn);opacity:.5"></i>Mezzanine</span><span><i style="background:var(--debt)"></i>Senior</span></div>
+    </div>
+  </section>
+
+  <!-- CASH FLOW -->
+  <section class="view" id="v-cashflow">
+    <div class="toolbar">
+      <div class="seg" id="cfPeriod"><button data-p="1" class="on">Monthly</button><button data-p="3">Quarterly</button><button data-p="12">Annual</button></div>
+      <span class="muted" style="font-size:12px" id="cfUnits"></span>
+      <div class="spacer"></div>
+      <button class="btn ghost sm" id="btnCsv">Export CSV</button>
+    </div>
+    <div class="tbl-wrap"><table class="cf" id="tCf"></table></div>
+  </section>
+
+  <!-- SENSITIVITY -->
+  <section class="view" id="v-sensitivity">
+    <h2 class="section">Two-way sensitivity: sales revenue × construction cost</h2>
+    <div class="toolbar">
+      <span class="muted" style="font-size:12px">Output</span>
+      <div class="seg" id="sensOut"><button data-o="margin" class="on">Margin on cost</button><button data-o="profit">Profit</button><button data-o="irr">Project IRR</button><button data-o="eirr">Equity IRR</button></div>
+      <span class="muted" style="font-size:12px;margin-left:12px">Step</span>
+      <select id="sensStep"><option value="5">5%</option><option value="10" selected>10%</option><option value="2.5">2.5%</option></select>
+    </div>
+    <div class="tbl-wrap"><table class="heat" id="tSens"></table></div>
+    <h2 class="section">Tornado: impact on development profit</h2>
+    <p class="note">Each variable is flexed on its own while everything else stays at base case.</p>
+    <div class="card"><div class="tor" id="tornado"></div></div>
+  </section>
+
+  <!-- RESIDUAL -->
+  <section class="view" id="v-residual">
+    <h2 class="section">Residual land value</h2>
+    <p class="note">Solves for the land purchase price that meets each target. All land-linked costs (transfer tax, legal, finance) are recalculated for each candidate price.</p>
+    <div class="kpis" id="resKpis"></div>
+    <h2 class="section">Land price vs. performance</h2>
+    <div class="card" style="max-width:900px"><svg class="chart" id="chRes" viewBox="0 0 640 280"></svg>
+      <div class="legend"><span><i style="background:var(--rev)"></i>Margin on cost</span><span><i style="background:var(--debt)"></i>Project IRR</span><span><i style="background:var(--ink-faint)"></i>Targets</span></div>
+    </div>
+    <h2 class="section">Breakeven analysis</h2>
+    <div class="kpis" id="beKpis"></div>
+  </section>
+</div>
+
+<script>
+'use strict';
+/* =================== DEFAULT EXAMPLE =================== */
+const EXAMPLE = () => ({
+  project:{name:'Al Nakheel Residences',location:'Riyadh, KSA',currency:'SAR',startDate:'2027-01',gfa:32000,nsa:24930,siteArea:6500},
+  land:{price:45000000,depositPct:10,depositMonth:0,settleMonth:3},
+  targets:{discount:12,margin:20,irr:18,revEsc:3,costEsc:4},
+  sales:[
+    {name:'1 Bedroom',units:80,area:75,rate:9000,start:30,span:8},
+    {name:'2 Bedroom',units:120,area:110,rate:8800,start:30,span:10},
+    {name:'3 Bedroom',units:60,area:150,rate:8500,start:31,span:10},
+    {name:'Penthouse',units:6,area:300,rate:12000,start:33,span:6},
+  ],
+  leases:[
+    {name:'Ground floor retail',nla:2500,rent:1400,occ:92,cap:7.5,purch:2.5,start:30,sale:36},
+  ],
+  costs:[
+    {cat:'Land',name:'Real estate transaction tax (RETT)',basis:'pctLand',qty:1,value:5,curve:'single',start:3,span:1,esc:false},
+    {cat:'Land',name:'Legal & brokerage',basis:'pctLand',qty:1,value:2.5,curve:'single',start:3,span:1,esc:false},
+    {cat:'Construction',name:'Building works',basis:'rate',qty:32000,value:4800,curve:'scurve',start:6,span:24,esc:true},
+    {cat:'Construction',name:'External works & utilities',basis:'lump',qty:1,value:6500000,curve:'straight',start:20,span:10,esc:true},
+    {cat:'Construction',name:'Construction contingency',basis:'pctCon',qty:1,value:5,curve:'scurve',start:6,span:24,esc:true},
+    {cat:'Professional fees',name:'Design & consultants',basis:'pctCon',qty:1,value:7,curve:'straight',start:0,span:30,esc:true},
+    {cat:'Statutory',name:'Authority & permit fees',basis:'lump',qty:1,value:2500000,curve:'single',start:4,span:1,esc:false},
+    {cat:'Marketing',name:'Marketing & sales launch',basis:'pctGRV',qty:1,value:1.5,curve:'straight',start:6,span:30,esc:false},
+    {cat:'Selling',name:'Sales commission',basis:'pctRev',qty:1,value:2,curve:'single',start:0,span:1,esc:false},
+    {cat:'Management',name:'Development management fee',basis:'pctCon',qty:1,value:2,curve:'straight',start:0,span:36,esc:false},
+    {cat:'Holding',name:'Land holding, insurance & security',basis:'lump',qty:1,value:1200000,curve:'straight',start:0,span:36,esc:true},
+  ],
+  finance:{equity:65000000,mezzLimit:20000000,mezzRate:13,mezzFee:2,seniorLTC:65,seniorRate:7.5,seniorFee:1},
+});
+
+const CATS = ['Land','Construction','Professional fees','Statutory','Marketing','Selling','Management','Holding','Other'];
+const BASES = {lump:'Lump sum',rate:'Qty × rate',pctCon:'% of construction',pctLand:'% of land',pctGRV:'% of GRV',pctRev:'% of revenue'};
+const CURVES = {scurve:'S-curve',straight:'Straight line',single:'Single month'};
+
+let S = load() || EXAMPLE();
+let R = null;
+
+/* =================== HELPERS =================== */
+const $ = id => document.getElementById(id);
+const sum = a => a.reduce((x,y)=>x+y,0);
+const zeros = n => new Array(n).fill(0);
+const num = v => { const x = parseFloat(v); return isFinite(x) ? x : 0; };
+const cur = () => S.project.currency || '';
+function fmt(v, d=0){ if(v==null||!isFinite(v)) return '–'; return v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function fm(v){ if(v==null||!isFinite(v)) return '–'; const a=Math.abs(v); const s=v<0?'-':'';
+  if(a>=1e9) return s+(a/1e9).toFixed(2)+'bn'; if(a>=1e6) return s+(a/1e6).toFixed(1)+'m'; if(a>=1e3) return s+(a/1e3).toFixed(0)+'k'; return s+a.toFixed(0); }
+const fpct = (v,d=1) => v==null||!isFinite(v) ? '–' : (v*100).toFixed(d)+'%';
+const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function monthLabel(i){
+  const [y,m] = (S.project.startDate||'2027-01').split('-').map(Number);
+  const d = new Date(y, (m||1)-1+i, 1);
+  return d.toLocaleString('en-US',{month:'short'})+' '+String(d.getFullYear()).slice(2);
+}
+
+/* Spend profile weights over n months */
+function profile(curve, n){
+  n = Math.max(1, Math.round(n));
+  if(curve==='single') return [1];
+  if(curve==='straight') return new Array(n).fill(1/n);
+  const F = x => x*x*(3-2*x);                    // smoothstep cumulative -> bell-shaped monthly spend
+  const w = []; for(let i=0;i<n;i++) w.push(F((i+1)/n)-F(i/n));
+  return w;
+}
+function spread(arr, amount, curve, start, span){
+  const w = profile(curve, span); start = Math.max(0, Math.round(start));
+  w.forEach((p,i)=>{ if(start+i < arr.length) arr[start+i] += amount*p; });
+}
+
+/* IRR on periodic flows (bisection, robust) -> periodic rate */
+function irr(cf){
+  if(!cf.some(v=>v<0) || !cf.some(v=>v>0)) return null;
+  const npv = r => cf.reduce((a,v,i)=>a+v/Math.pow(1+r,i),0);
+  let lo=-0.99, hi=1, flo=npv(lo), fhi=npv(hi);
+  if(flo*fhi>0) return null;
+  for(let k=0;k<200;k++){ const m=(lo+hi)/2, fm_=npv(m); if(Math.abs(fm_)<1e-6) return m; if(flo*fm_<0){hi=m;fhi=fm_;} else {lo=m;flo=fm_;} }
+  return (lo+hi)/2;
+}
+const annual = r => r==null ? null : Math.pow(1+r,12)-1;
+
+/* =================== ENGINE =================== */
+/* o = overrides: revMult, conMult, landPrice, rateAdd (pts), revDelay (months) */
+function model(st, o={}){
+  const revMult = o.revMult ?? 1, conMult = o.conMult ?? 1, rateAdd = o.rateAdd ?? 0, delay = o.revDelay ?? 0;
+  const landPrice = o.landPrice ?? num(st.land.price);
+  const T = st.targets, F = st.finance;
+  const revEsc = t => Math.pow(1+num(T.revEsc)/100, t/12);
+  const costEsc = t => Math.pow(1+num(T.costEsc)/100, t/12);
+
+  // horizon
+  let H = 12;
+  st.sales.forEach(s => H = Math.max(H, num(s.start)+delay+Math.max(1,num(s.span))));
+  st.leases.forEach(l => H = Math.max(H, num(l.sale)+delay+1));
+  st.costs.forEach(c => H = Math.max(H, num(c.start)+(c.curve==='single'?1:Math.max(1,num(c.span)))));
+  H = Math.max(H, num(st.land.settleMonth)+1, num(st.land.depositMonth)+1) + 1;
+
+  // ---- revenue
+  const revLines = [];
+  st.sales.forEach(s => {
+    const a = zeros(H), total = num(s.units)*num(s.area)*num(s.rate)*revMult;
+    const w = profile('straight', num(s.span)), st0 = Math.round(num(s.start)+delay);
+    w.forEach((p,i)=>{ const t=st0+i; if(t<H) a[t] += total*p*revEsc(t); });
+    revLines.push({name:s.name||'Sales', type:'sale', arr:a});
+  });
+  st.leases.forEach(l => {
+    const rentPa = num(l.nla)*num(l.rent)*num(l.occ)/100*revMult;
+    const rent = zeros(H), sale = zeros(H);
+    const s0 = Math.round(num(l.start)+delay), sm = Math.round(num(l.sale)+delay);
+    for(let t=s0; t<Math.min(sm,H); t++) rent[t] += rentPa/12*revEsc(t);
+    if(sm<H && num(l.cap)>0) sale[sm] += rentPa*revEsc(sm)/(num(l.cap)/100)/(1+num(l.purch)/100);
+    revLines.push({name:(l.name||'Lease')+' – rent', type:'rent', arr:rent});
+    revLines.push({name:(l.name||'Lease')+' – sale', type:'invest', arr:sale});
+  });
+  const rev = zeros(H); revLines.forEach(r => r.arr.forEach((v,i)=>rev[i]+=v));
+  const GRV = sum(rev);
+
+  // ---- costs
+  const landArr = zeros(H);
+  landArr[Math.min(H-1,Math.round(num(st.land.depositMonth)))] += landPrice*num(st.land.depositPct)/100;
+  landArr[Math.min(H-1,Math.round(num(st.land.settleMonth)))] += landPrice*(1-num(st.land.depositPct)/100);
+  const conBase = sum(st.costs.filter(c=>c.cat==='Construction' && (c.basis==='lump'||c.basis==='rate'))
+                    .map(c => (c.basis==='rate'? num(c.qty)*num(c.value) : num(c.value))))*conMult;
+  const costLines = [{cat:'Land', name:'Land purchase price', arr:landArr}];
+  st.costs.forEach(c => {
+    const a = zeros(H); let base = 0;
+    const isCon = c.cat==='Construction';
+    switch(c.basis){
+      case 'lump': base = num(c.value)*(isCon?conMult:1); break;
+      case 'rate': base = num(c.qty)*num(c.value)*(isCon?conMult:1); break;
+      case 'pctCon': base = conBase*num(c.value)/100; break;
+      case 'pctLand': base = landPrice*num(c.value)/100; break;
+      case 'pctGRV': base = GRV*num(c.value)/100; break;
+    }
+    if(c.basis==='pctRev'){ rev.forEach((v,i)=> a[i] += v*num(c.value)/100); }
+    else {
+      const w = profile(c.curve, num(c.span)), s0 = Math.max(0,Math.round(num(c.start)));
+      w.forEach((p,i)=>{ const t=s0+i; if(t<H) a[t] += base*p*(c.esc?costEsc(t):1); });
+    }
+    costLines.push({cat:c.cat, name:c.name, arr:a});
+  });
+  const cost = zeros(H); costLines.forEach(c => c.arr.forEach((v,i)=>cost[i]+=v));
+  const costExFin = sum(cost);
+
+  // ---- funding (iterate on senior limit which depends on TDC incl. finance)
+  const eqCap = num(F.equity), mzLim = num(F.mezzLimit);
+  const rs = (num(F.seniorRate)+rateAdd)/100/12, rm = (num(F.mezzRate)+rateAdd)/100/12;
+  let tdc = costExFin*1.08, f = null;
+  for(let it=0; it<8; it++){
+    const snLim = num(F.seniorLTC)/100*tdc;
+    f = fund(snLim);
+    const newTdc = costExFin + f.finTotal;
+    if(Math.abs(newTdc-tdc) < 1) { tdc=newTdc; break; }
+    tdc = newTdc;
+  }
+  function fund(snLim){
+    const o = {eqIn:zeros(H),eqOut:zeros(H),mzDraw:zeros(H),mzRep:zeros(H),snDraw:zeros(H),snRep:zeros(H),
+               mzInt:zeros(H),snInt:zeros(H),fees:zeros(H),mzBal:zeros(H),snBal:zeros(H),shortfall:zeros(H),snLim};
+    let eqUsed=0, mz=0, sn=0;
+    for(let t=0;t<H;t++){
+      const iS = sn*rs, iM = mz*rm;
+      let fee = 0;
+      if(t===0){ fee += snLim*num(F.seniorFee)/100 + mzLim*num(F.mezzFee)/100; }
+      o.snInt[t]=iS; o.mzInt[t]=iM; o.fees[t]=fee;
+      sn += iS; mz += iM;                           // capitalise interest
+      let need = cost[t] + fee - rev[t];
+      if(need > 0){
+        let d = Math.min(need, Math.max(0,eqCap-eqUsed)); o.eqIn[t]+=d; eqUsed+=d; need-=d;
+        d = Math.min(need, Math.max(0,mzLim-mz)); o.mzDraw[t]+=d; mz+=d; need-=d;
+        d = Math.min(need, Math.max(0,snLim-sn)); o.snDraw[t]+=d; sn+=d; need-=d;
+        if(need>1e-6){ o.shortfall[t]+=need; o.eqIn[t]+=need; eqUsed+=need; }
+      } else {
+        let surplus = -need;
+        let d = Math.min(surplus, sn); o.snRep[t]+=d; sn-=d; surplus-=d;
+        d = Math.min(surplus, mz); o.mzRep[t]+=d; mz-=d; surplus-=d;
+        o.eqOut[t]+=surplus;
+      }
+      o.snBal[t]=sn; o.mzBal[t]=mz;
+    }
+    o.unpaid = sn+mz;
+    o.finTotal = sum(o.snInt)+sum(o.mzInt)+sum(o.fees);
+    return o;
+  }
+
+  const finTotal = f.finTotal;
+  const TDC = costExFin + finTotal;
+  const profit = GRV - TDC;
+  const net = rev.map((v,i)=>v-cost[i]);
+  const eqFlow = f.eqIn.map((v,i)=>f.eqOut[i]-v);
+  if(f.unpaid>1) eqFlow[H-1] -= f.unpaid;   // debt not repaid out of revenue falls on equity
+  const pIRRm = irr(net), eIRRm = irr(eqFlow);
+  const dr = Math.pow(1+num(T.discount)/100,1/12)-1;
+  const NPV = net.reduce((a,v,i)=>a+v/Math.pow(1+dr,i),0);
+  const byCat = {}; costLines.forEach(c => byCat[c.cat] = (byCat[c.cat]||0)+sum(c.arr));
+  const peakDebt = Math.max(0,...f.snBal.map((v,i)=>v+f.mzBal[i]));
+  const eqTotal = sum(f.eqIn);
+  let cum=0, peakNeg=0; net.forEach(v=>{cum+=v; peakNeg=Math.min(peakNeg,cum);});
+  return {H, rev, revLines, cost, costLines, byCat, GRV, costExFin, finTotal, TDC, profit, net, f, eqFlow,
+    margin: TDC? profit/TDC : null, marginGRV: GRV? profit/GRV : null, pIRR: annual(pIRRm), eIRR: annual(eIRRm), NPV,
+    peakDebt, eqTotal, peakCash:-peakNeg, shortfall: sum(f.shortfall), unpaid: f.unpaid, landPrice, conBase,
+    eqMultiple: eqTotal? sum(f.eqOut)/eqTotal : null};
+}
+
+/* =================== SOLVERS =================== */
+function solve(fn, lo, hi, target, inc){   // fn monotonic; inc=true if increasing in x
+  const tol = (hi-lo)*1e-7;
+  let flo = fn(lo), fhi = fn(hi);
+  if(flo==null || fhi==null) return null;
+  if(inc ? (target<flo||target>fhi) : (target>flo||target<fhi)) return null;
+  for(let k=0;k<60;k++){ const m=(lo+hi)/2, v=fn(m); if(v==null) return null;
+    if((v<target)===inc) lo=m; else hi=m; if(hi-lo<tol) break; }
+  return (lo+hi)/2;
+}
+
+/* =================== FORMS =================== */
+function field(obj, key, label, type='number', opts){
+  const id = 'f_'+Math.random().toString(36).slice(2);
+  let input;
+  if(type==='select') input = `<select id="${id}">${Object.entries(opts).map(([k,v])=>`<option value="${k}" ${obj[key]==k?'selected':''}>${v}</option>`).join('')}</select>`;
+  else input = `<input id="${id}" type="${type}" value="${esc(obj[key]??'')}" ${type==='number'?'step="any"':''}>`;
+  setTimeout(()=>{ $(id).addEventListener('input', e => { obj[key] = type==='number' ? num(e.target.value) : e.target.value; changed(); }); });
+  return `<label>${label}${input}</label>`;
+}
+function renderForms(){
+  const P=S.project, L=S.land, T=S.targets, F=S.finance;
+  $('fProject').innerHTML = [
+    field(P,'name','Project name','text'), field(P,'location','Location','text'),
+    field(P,'currency','Currency','text'), field(P,'startDate','Start month','month'),
+    field(P,'siteArea','Site area (m²)'), field(P,'gfa','Gross floor area (m²)'), field(P,'nsa','Net saleable area (m²)'),
+  ].join('');
+  $('fLand').innerHTML = [
+    field(L,'price','Purchase price'), field(L,'depositPct','Deposit (%)'),
+    field(L,'depositMonth','Deposit month'), field(L,'settleMonth','Settlement month'),
+  ].join('');
+  $('fTargets').innerHTML = [
+    field(T,'margin','Target margin on cost (%)'), field(T,'irr','Target project IRR (%)'),
+    field(T,'discount','Discount rate for NPV (% p.a.)'),
+    field(T,'revEsc','Revenue escalation (% p.a.)'), field(T,'costEsc','Cost escalation (% p.a.)'),
+  ].join('');
+  $('fFinance').innerHTML = [
+    field(F,'equity','Equity contribution'),
+    field(F,'mezzLimit','Mezzanine limit'), field(F,'mezzRate','Mezzanine rate (% p.a.)'), field(F,'mezzFee','Mezzanine fee (%)'),
+    field(F,'seniorLTC','Senior limit (% of TDC)'), field(F,'seniorRate','Senior rate (% p.a.)'), field(F,'seniorFee','Senior establishment fee (%)'),
+  ].join('');
+}
+
+/* Editable tables */
+function editTable(el, rows, cols, onRemove){
+  const head = '<tr>'+cols.map(c=>`<th class="${c.calc||c.type!=='text'&&c.type!=='select'?'n':''}">${c.label}</th>`).join('')+'<th></th></tr>';
+  const body = rows.map((r,i)=>'<tr>'+cols.map(c=>{
+    if(c.calc) return `<td class="calc" data-calc="${c.key}" data-row="${i}"></td>`;
+    if(c.type==='select') return `<td style="min-width:${c.w||120}px"><select data-row="${i}" data-key="${c.key}">${Object.entries(c.opts).map(([k,v])=>`<option value="${k}" ${r[c.key]==k?'selected':''}>${v}</option>`).join('')}</select></td>`;
+    if(c.type==='check') return `<td style="text-align:center"><input type="checkbox" data-row="${i}" data-key="${c.key}" ${r[c.key]?'checked':''} style="width:auto"></td>`;
+    return `<td style="min-width:${c.w||80}px"><input type="${c.type||'number'}" step="any" data-row="${i}" data-key="${c.key}" value="${esc(r[c.key]??'')}"></td>`;
+  }).join('')+`<td><button class="btn x" data-del="${i}" title="Remove">×</button></td></tr>`).join('');
+  el.innerHTML = head + body + (el.dataset.tot ? '<tr class="tot" data-totrow></tr>' : '');
+  el.querySelectorAll('[data-key]').forEach(inp => {
+    const ev = inp.tagName==='SELECT' || inp.type==='checkbox' ? 'change' : 'input';
+    inp.addEventListener(ev, e => {
+      const r = rows[+inp.dataset.row], c = cols.find(c=>c.key===inp.dataset.key);
+      r[c.key] = inp.type==='checkbox' ? inp.checked : (c.type==='text'||c.type==='select') ? inp.value : num(inp.value);
+      changed();
+    });
+  });
+  el.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => { rows.splice(+b.dataset.del,1); onRemove(); changed(); }));
+}
+const salesCols = [
+  {key:'name',label:'Description',type:'text',w:160},{key:'units',label:'Units'},{key:'area',label:'Area/unit (m²)'},
+  {key:'rate',label:'Rate /m²'},{key:'_price',label:'Price/unit',calc:1},{key:'_total',label:'Total (today’s value)',calc:1},
+  {key:'start',label:'Settle start (mth)'},{key:'span',label:'Span (mths)'}];
+const leaseCols = [
+  {key:'name',label:'Description',type:'text',w:160},{key:'nla',label:'NLA (m²)'},{key:'rent',label:'Net rent /m²/yr'},
+  {key:'occ',label:'Occupancy %'},{key:'cap',label:'Cap rate %'},{key:'purch',label:'Purchaser costs %'},
+  {key:'_noi',label:'Net income p.a.',calc:1},{key:'_val',label:'Capital value',calc:1},
+  {key:'start',label:'Lease start (mth)'},{key:'sale',label:'Sale month'}];
+const costCols = [
+  {key:'cat',label:'Category',type:'select',w:150,opts:Object.fromEntries(CATS.map(c=>[c,c]))},
+  {key:'name',label:'Description',type:'text',w:240},{key:'basis',label:'Basis',type:'select',w:160,opts:BASES},
+  {key:'qty',label:'Qty'},{key:'value',label:'Rate / amount / %'},{key:'_amt',label:'Amount (incl. esc.)',calc:1},
+  {key:'curve',label:'Timing',type:'select',w:130,opts:CURVES},{key:'start',label:'Start (mth)'},{key:'span',label:'Span (mths)'},
+  {key:'esc',label:'Escalate',type:'check'}];
+
+function renderTables(){
+  $('tSales').dataset.tot = 1; $('tLeases').dataset.tot = 1; $('tCosts').dataset.tot = 1;
+  editTable($('tSales'), S.sales, salesCols, renderTables);
+  editTable($('tLeases'), S.leases, leaseCols, renderTables);
+  editTable($('tCosts'), S.costs, costCols, renderTables);
+}
+
+/* =================== OUTPUT RENDER =================== */
+function kpi(l, v, s='', cls=''){ return `<div class="kpi ${cls}"><div class="l">${l}</div><div class="v">${v}</div>${s?`<div class="s">${s}</div>`:''}</div>`; }
+
+function renderCalcCells(){
+  const c = cur();
+  document.querySelectorAll('#tSales [data-calc]').forEach(td => { const r=S.sales[+td.dataset.row]; const p=num(r.area)*num(r.rate);
+    td.textContent = fmt(td.dataset.calc==='_price'? p : p*num(r.units)); });
+  document.querySelectorAll('#tLeases [data-calc]').forEach(td => { const r=S.leases[+td.dataset.row]; const noi=num(r.nla)*num(r.rent)*num(r.occ)/100;
+    td.textContent = fmt(td.dataset.calc==='_noi'? noi : (num(r.cap)? noi/(num(r.cap)/100)/(1+num(r.purch)/100):0)); });
+  document.querySelectorAll('#tCosts [data-calc]').forEach(td => { const i=+td.dataset.row; td.textContent = fmt(sum(R.costLines[i+1].arr)); });
+  const st = $('tSales').querySelector('[data-totrow]');
+  if(st) st.innerHTML = `<td>Total</td><td class="n">${fmt(sum(S.sales.map(s=>num(s.units))))}</td><td></td><td></td><td></td><td class="n">${fmt(sum(S.sales.map(s=>num(s.units)*num(s.area)*num(s.rate))))}</td><td colspan="3"></td>`;
+  const lt = $('tLeases').querySelector('[data-totrow]');
+  if(lt) lt.innerHTML = `<td>Total</td><td class="n">${fmt(sum(S.leases.map(l=>num(l.nla))))}</td><td colspan="9"></td>`;
+  const ct = $('tCosts').querySelector('[data-totrow]');
+  if(ct) ct.innerHTML = `<td colspan="5">Total costs excl. land price &amp; finance</td><td class="n">${fmt(sum(R.costLines.slice(1).map(l=>sum(l.arr))))}</td><td colspan="5"></td>`;
+}
+
+function render(){
+  R = model(S);
+  const c = cur(), T = S.targets;
+  document.title = 'Bohio · '+(S.project.name||'Feasibility');
+  $('sumTitle').textContent = (S.project.name||'Project')+' · '+(S.project.location||'');
+
+  // warnings
+  const w = [];
+  if(R.shortfall>1) w.push(`Funding shortfall of ${c} ${fmt(R.shortfall)} beyond all facilities. It has been funded as extra equity.`);
+  if(R.unpaid>1) w.push(`Revenue does not fully repay debt: ${c} ${fmt(R.unpaid)} remains outstanding at the end of the project.`);
+  $('warn').innerHTML = w.join('<br>'); $('warn').classList.toggle('show', w.length>0);
+
+  const okM = R.margin >= T.margin/100, okI = R.pIRR!=null && R.pIRR >= T.irr/100;
+  $('kpis').innerHTML = [
+    kpi('Gross realisation (GRV)', fm(R.GRV), c+' incl. escalation'),
+    kpi('Total development cost', fm(R.TDC), 'incl. '+c+' '+fm(R.finTotal)+' finance'),
+    kpi('Development profit', fm(R.profit), c, R.profit<0?'bad':''),
+    kpi('Margin on cost', fpct(R.margin), 'target '+T.margin+'%', okM?'good':'bad'),
+    kpi('Margin on GRV', fpct(R.marginGRV)),
+    kpi('Project IRR', fpct(R.pIRR), 'unlevered · target '+T.irr+'%', okI?'good':'bad'),
+    kpi('Equity IRR', fpct(R.eIRR), 'levered, equity multiple '+(R.eqMultiple?R.eqMultiple.toFixed(2)+'×':'–')),
+    kpi('NPV @ '+T.discount+'%', fm(R.NPV), c+' unlevered', R.NPV<0?'bad':''),
+    kpi('Peak debt', fm(R.peakDebt), c+' senior + mezz'),
+    kpi('Project duration', R.H-1+' mths', 'from '+monthLabel(0)),
+  ].join('');
+
+  // statement
+  const rows = [];
+  rows.push(`<tr class="hd"><td colspan="3">Revenue</td></tr>`);
+  R.revLines.forEach(r => { const v=sum(r.arr); if(v) rows.push(`<tr class="ind"><td>${esc(r.name)}</td><td class="n">${fmt(v)}</td><td class="n muted">${fpct(v/R.GRV)}</td></tr>`); });
+  rows.push(`<tr class="sub"><td>Gross realisation</td><td class="n">${fmt(R.GRV)}</td><td class="n">100.0%</td></tr>`);
+  rows.push(`<tr class="hd"><td colspan="3">Development costs</td></tr>`);
+  Object.entries(R.byCat).forEach(([k,v]) => rows.push(`<tr class="ind"><td>${esc(k)}</td><td class="n">${fmt(v)}</td><td class="n muted">${fpct(v/R.TDC)}</td></tr>`));
+  rows.push(`<tr class="ind"><td>Finance: senior interest</td><td class="n">${fmt(sum(R.f.snInt))}</td><td class="n muted">${fpct(sum(R.f.snInt)/R.TDC)}</td></tr>`);
+  rows.push(`<tr class="ind"><td>Finance: mezzanine interest</td><td class="n">${fmt(sum(R.f.mzInt))}</td><td class="n muted">${fpct(sum(R.f.mzInt)/R.TDC)}</td></tr>`);
+  rows.push(`<tr class="ind"><td>Finance: fees</td><td class="n">${fmt(sum(R.f.fees))}</td><td class="n muted">${fpct(sum(R.f.fees)/R.TDC)}</td></tr>`);
+  rows.push(`<tr class="sub"><td>Total development cost</td><td class="n">${fmt(R.TDC)}</td><td class="n">100.0%</td></tr>`);
+  rows.push(`<tr class="tot"><td>Development profit</td><td class="n ${R.profit<0?'neg':''}">${fmt(R.profit)}</td><td class="n">${fpct(R.margin)}</td></tr>`);
+  const P = S.project;
+  rows.push(`<tr class="hd"><td colspan="3">Indicators</td></tr>`);
+  if(num(P.gfa)) rows.push(`<tr class="ind"><td>TDC per m² GFA</td><td class="n">${fmt(R.TDC/num(P.gfa))}</td><td></td></tr>`);
+  if(num(P.nsa)) rows.push(`<tr class="ind"><td>Profit per m² NSA</td><td class="n">${fmt(R.profit/num(P.nsa))}</td><td></td></tr>`);
+  if(num(P.siteArea)) rows.push(`<tr class="ind"><td>Land price per m² site</td><td class="n">${fmt(R.landPrice/num(P.siteArea))}</td><td></td></tr>`);
+  if(num(P.siteArea)&&num(P.gfa)) rows.push(`<tr class="ind"><td>Floor area ratio</td><td class="n">${(num(P.gfa)/num(P.siteArea)).toFixed(2)} : 1</td><td></td></tr>`);
+  rows.push(`<tr class="ind"><td>Equity contributed</td><td class="n">${fmt(R.eqTotal)}</td><td></td></tr>`);
+  $('stmt').innerHTML = `<tr><th>Item</th><th class="n">${esc(c)}</th><th class="n">%</th></tr>`+rows.join('');
+
+  // cost bars
+  const cats = Object.entries(R.byCat).concat([['Finance',R.finTotal]]).sort((a,b)=>b[1]-a[1]);
+  const mx = Math.max(...cats.map(x=>x[1]));
+  $('costBars').innerHTML = cats.map(([k,v])=>`<div style="display:grid;grid-template-columns:130px 1fr 80px;gap:10px;align-items:center;font-size:12px;margin:5px 0">
+    <span>${esc(k)}</span><div style="background:var(--paper);height:14px"><div style="width:${(v/mx*100).toFixed(1)}%;height:100%;background:var(--ink)"></div></div><span style="text-align:right" class="muted">${fm(v)}</span></div>`).join('');
+
+  chartCum(); chartDebt();
+
+  // revenue kpis
+  const sales = sum(R.revLines.filter(r=>r.type==='sale').map(r=>sum(r.arr)));
+  const rent = sum(R.revLines.filter(r=>r.type==='rent').map(r=>sum(r.arr)));
+  const inv = sum(R.revLines.filter(r=>r.type==='invest').map(r=>sum(r.arr)));
+  $('revKpis').innerHTML = kpi('Unit sales',fm(sales),c)+kpi('Rental income',fm(rent),c)+kpi('Investment sales',fm(inv),c)+kpi('Total GRV',fm(R.GRV),c)
+    +kpi('Units',fmt(sum(S.sales.map(s=>num(s.units)))))+kpi('Avg rate /m²', fmt(sales/Math.max(1,sum(S.sales.map(s=>num(s.units)*num(s.area))))), c+' realised');
+
+  // finance kpis
+  $('finKpis').innerHTML = [
+    kpi('Senior limit', fm(R.f.snLim), c+' · '+S.finance.seniorLTC+'% of TDC'),
+    kpi('Peak senior', fm(Math.max(...R.f.snBal)), c),
+    kpi('Peak mezzanine', fm(Math.max(...R.f.mzBal)), c),
+    kpi('Equity contributed', fm(R.eqTotal), c, R.shortfall>1?'bad':''),
+    kpi('Total interest', fm(sum(R.f.snInt)+sum(R.f.mzInt)), c),
+    kpi('Fees', fm(sum(R.f.fees)), c),
+    kpi('Equity IRR', fpct(R.eIRR)),
+    kpi('Equity multiple', R.eqMultiple?R.eqMultiple.toFixed(2)+'×':'–'),
+  ].join('');
+
+  renderCalcCells();
+  renderCF();
+  renderSens();
+  renderResidual();
+}
+
+/* ---- charts (inline SVG) ---- */
+function axes(svg, W, Hh, pad, ymin, ymax, n, fmtY){
+  let g = '';
+  const y = v => pad.t + (ymax-v)/(ymax-ymin)*(Hh-pad.t-pad.b);
+  for(let k=0;k<=4;k++){ const v=ymin+(ymax-ymin)*k/4; g+=`<line x1="${pad.l}" x2="${W-pad.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--ink-hairline)"/><text x="${pad.l-6}" y="${y(v)+3}" text-anchor="end">${fmtY(v)}</text>`; }
+  const step = Math.max(1, Math.ceil(n/12));
+  const bw = (W-pad.l-pad.r)/n;
+  for(let i=0;i<n;i+=step) g+=`<text x="${pad.l+bw*(i+.5)}" y="${Hh-pad.b+14}" text-anchor="middle">${monthLabel(i)}</text>`;
+  return {g, y, bw};
+}
+function chartCum(){
+  const W=640,Hh=300,pad={l:52,r:10,t:10,b:24}, n=R.H;
+  let cum=0; const cumArr=R.net.map(v=>cum+=v);
+  const debt = R.f.snBal.map((v,i)=>v+R.f.mzBal[i]);
+  const ymax = Math.max(...R.rev, ...debt, ...cumArr, 1)*1.05, ymin = Math.min(...R.cost.map(v=>-v), ...cumArr, 0)*1.05;
+  const {g,y,bw} = axes(null,W,Hh,pad,ymin,ymax,n,fm);
+  let s = g;
+  for(let i=0;i<n;i++){
+    const x = pad.l+bw*i+bw*.15, w=bw*.7;
+    if(R.rev[i]) s+=`<rect x="${x}" y="${y(R.rev[i])}" width="${w}" height="${y(0)-y(R.rev[i])}" fill="var(--rev)"/>`;
+    if(R.cost[i]) s+=`<rect x="${x}" y="${y(0)}" width="${w}" height="${y(-R.cost[i])-y(0)}" fill="var(--cost)" opacity=".75"/>`;
+  }
+  const line = (arr,col,dash='') => `<polyline fill="none" stroke="${col}" stroke-width="2" ${dash?`stroke-dasharray="${dash}"`:''} points="${arr.map((v,i)=>`${pad.l+bw*(i+.5)},${y(v)}`).join(' ')}"/>`;
+  s += line(debt,'var(--debt)') + line(cumArr,'var(--alert)','4 3');
+  s += `<line x1="${pad.l}" x2="${W-pad.r}" y1="${y(0)}" y2="${y(0)}" stroke="var(--ink)"/>`;
+  $('chCum').innerHTML = s;
+}
+function chartDebt(){
+  const W=640,Hh=260,pad={l:52,r:10,t:10,b:24}, n=R.H;
+  let ce=0; const eq = R.f.eqIn.map(v=>ce+=v);
+  const tot = eq.map((v,i)=>v+R.f.mzBal[i]+R.f.snBal[i]);
+  const ymax = Math.max(...tot,1)*1.05;
+  const {g,y,bw} = axes(null,W,Hh,pad,0,ymax,n,fm);
+  const area = (lo,hi,col,op) => `<polygon fill="${col}" opacity="${op}" points="${hi.map((v,i)=>`${pad.l+bw*(i+.5)},${y(v)}`).join(' ')} ${lo.map((v,i)=>`${pad.l+bw*(i+.5)},${y(v)}`).reverse().join(' ')}"/>`;
+  const l1 = eq, l2 = eq.map((v,i)=>v+R.f.mzBal[i]);
+  $('chDebt').innerHTML = g + area(zeros(n),l1,'var(--equity)',.8) + area(l1,l2,'var(--warn)',.45) + area(l2,tot,'var(--debt)',.85);
+}
+
+/* ---- cash flow table ---- */
+let cfP = 1;
+function bucket(arr){ if(cfP===1) return arr; const o=[]; for(let i=0;i<arr.length;i+=cfP) o.push(sum(arr.slice(i,i+cfP))); return o; }
+function cfRows(){
+  const f = R.f, rows = [];
+  const add = (label, arr, cls='') => rows.push({label, arr, cls});
+  add('REVENUE', null, 'hd');
+  R.revLines.forEach(r => { if(sum(r.arr)) add(r.name, r.arr); });
+  add('Total revenue', R.rev, 'tot');
+  add('DEVELOPMENT COSTS', null, 'hd');
+  R.costLines.forEach(c => add(c.cat+': '+c.name, c.arr.map(v=>-v)));
+  add('Total costs', R.cost.map(v=>-v), 'tot');
+  add('Net cash flow before finance', R.net, 'tot');
+  let cm=0; add('Cumulative before finance', R.net.map(v=>cm+=v), 'sub');
+  add('FINANCE', null, 'hd');
+  add('Equity contributed', f.eqIn); add('Equity distributed', f.eqOut.map(v=>-v));
+  add('Mezzanine drawdown', f.mzDraw); add('Mezzanine repayment', f.mzRep.map(v=>-v)); add('Mezzanine interest (capitalised)', f.mzInt.map(v=>-v));
+  add('Senior drawdown', f.snDraw); add('Senior repayment', f.snRep.map(v=>-v)); add('Senior interest (capitalised)', f.snInt.map(v=>-v));
+  add('Finance fees', f.fees.map(v=>-v));
+  add('Mezzanine balance', f.mzBal, 'bal'); add('Senior balance', f.snBal, 'bal');
+  add('Equity cash flow (levered)', R.eqFlow, 'tot');
+  return rows;
+}
+function renderCF(){
+  const n = R.H, heads = [];
+  for(let i=0;i<n;i+=cfP){ heads.push(cfP===1? monthLabel(i) : cfP===3 ? 'Q'+(Math.floor(i/3)+1)+' · '+monthLabel(i) : 'Yr '+(Math.floor(i/12)+1)); }
+  $('cfUnits').textContent = cur()+' · '+(cfP===1?'monthly':cfP===3?'quarterly':'annual')+' · month 0 = '+monthLabel(0);
+  let h = `<tr><th>Line item</th><th class="n">Total</th>${heads.map(x=>`<th class="n">${x}</th>`).join('')}</tr>`;
+  cfRows().forEach(r => {
+    if(!r.arr){ h += `<tr class="hd"><td colspan="${heads.length+2}">${r.label}</td></tr>`; return; }
+    const b = r.cls==='bal' ? (cfP===1? r.arr : r.arr.filter((_,i)=>(i+1)%cfP===0 || i===r.arr.length-1)) : bucket(r.arr);
+    const tot = r.cls==='bal'||r.cls==='sub' ? '' : fmt(sum(r.arr));
+    h += `<tr class="${r.cls==='tot'?'tot':r.cls==='sub'?'sub':''}"><td>${esc(r.label)}</td><td class="n">${tot}</td>${b.map(v=>`<td class="n ${v<-0.5?'neg':''}">${Math.abs(v)<0.5?'':fmt(v)}</td>`).join('')}</tr>`;
+  });
+  $('tCf').innerHTML = h;
+}
+function exportCSV(){
+  const n = R.H, lines = [['Line item','Total',...Array.from({length:n},(_,i)=>monthLabel(i))]];
+  cfRows().forEach(r => { if(r.arr) lines.push([r.label, r.cls==='bal'||r.cls==='sub'?'':sum(r.arr).toFixed(2), ...r.arr.map(v=>v.toFixed(2))]); else lines.push([r.label]); });
+  download((S.project.name||'feasibility')+'-cashflow.csv', lines.map(l=>l.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n'), 'text/csv');
+}
+
+/* ---- sensitivity ---- */
+let sensOut = 'margin';
+function metric(r){ return sensOut==='margin'? r.margin : sensOut==='profit'? r.profit : sensOut==='irr'? r.pIRR : r.eIRR; }
+function fmtMetric(v){ return sensOut==='profit'? fm(v) : fpct(v); }
+function renderSens(){
+  if(!$('v-sensitivity').classList.contains('active')) return;
+  const step = num($('sensStep').value)/100, ks = [-2,-1,0,1,2];
+  const tgt = sensOut==='margin'? S.targets.margin/100 : sensOut==='irr'? S.targets.irr/100 : sensOut==='profit'? 0 : S.targets.irr/100;
+  let h = `<tr><th>Construction ↓ / Revenue →</th>${ks.map(k=>`<th class="n">${k>0?'+':''}${(k*step*100).toFixed(1)}%</th>`).join('')}</tr>`;
+  ks.slice().reverse().forEach(kc => {
+    h += `<tr><th>${kc>0?'+':''}${(kc*step*100).toFixed(1)}%</th>`;
+    ks.forEach(kr => {
+      const v = metric(model(S,{revMult:1+kr*step, conMult:1+kc*step}));
+      const good = v!=null && v>=tgt;
+      const a = v==null?0:Math.min(1,Math.abs(v-tgt)/(Math.abs(tgt)||Math.abs(R.profit)||1)*1.2);
+      const bg = good? `rgba(21,128,61,${.08+a*.35})` : `rgba(214,48,77,${.08+a*.35})`;
+      h += `<td class="${kr===0&&kc===0?'base':''}" style="background:${bg}">${fmtMetric(v)}</td>`;
+    });
+    h += '</tr>';
+  });
+  $('tSens').innerHTML = h;
+
+  const base = R.profit;
+  const vars = [
+    ['Sales revenue ±10%', {revMult:.9},{revMult:1.1}],
+    ['Construction cost ±10%', {conMult:1.1},{conMult:.9}],
+    ['Land price ±10%', {landPrice:R.landPrice*1.1},{landPrice:R.landPrice*.9}],
+    ['Interest rates ±2 pts', {rateAdd:2},{rateAdd:-2}],
+    ['Sales delayed 6 months', {revDelay:6},{revDelay:0}],
+  ].map(([l,lo,hi]) => ({l, lo:model(S,lo).profit-base, hi:model(S,hi).profit-base}));
+  vars.sort((a,b)=>Math.max(Math.abs(b.lo),Math.abs(b.hi))-Math.max(Math.abs(a.lo),Math.abs(a.hi)));
+  const mx = Math.max(1,...vars.flatMap(v=>[Math.abs(v.lo),Math.abs(v.hi)]));
+  const pos = v => 50 + v/mx*48;
+  $('tornado').innerHTML = vars.map(v => {
+    const seg = (d,col) => { if(Math.abs(d)<1) return ''; const a=pos(Math.min(0,d)), b=pos(Math.max(0,d));
+      return `<span style="left:${a}%;width:${b-a}%;background:${col};${d<0?'justify-content:flex-start':'justify-content:flex-end'}">${d>0?'+':''}${fm(d)}</span>`; };
+    return `<div>${v.l}</div><div class="bar">${seg(v.lo,'var(--alert)')}${seg(v.hi,'var(--good)')}<div class="mid" style="left:50%"></div></div>`;
+  }).join('') + `<div></div><div class="muted" style="font-size:11px;text-align:center">Base profit ${cur()} ${fm(base)} · red = downside case, green = upside case</div>`;
+}
+
+/* ---- residual ---- */
+function renderResidual(){
+  if(!$('v-residual').classList.contains('active')) return;
+  const c = cur(), T = S.targets, hi = Math.max(R.GRV, R.landPrice*3, 1);
+  const rlvM = solve(x => model(S,{landPrice:x}).margin, 0, hi, T.margin/100, false);
+  const rlvI = solve(x => model(S,{landPrice:x}).pIRR, 0, hi, T.irr/100, false);
+  const rlvN = solve(x => model(S,{landPrice:x}).NPV, 0, hi, 0, false);
+  const sa = num(S.project.siteArea), gfa = num(S.project.gfa);
+  const sub = v => v==null? 'target not reachable' : (sa? fmt(v/sa)+' /m² site · ':'')+(gfa? fmt(v/gfa)+' /m² GFA':'');
+  $('resKpis').innerHTML = [
+    kpi('Current land price', fm(R.landPrice), c+' · '+(sa?fmt(R.landPrice/sa)+' /m² site':'')),
+    kpi('RLV @ '+T.margin+'% margin', fm(rlvM), sub(rlvM), rlvM!=null&&rlvM>=R.landPrice?'good':'bad'),
+    kpi('RLV @ '+T.irr+'% project IRR', fm(rlvI), sub(rlvI), rlvI!=null&&rlvI>=R.landPrice?'good':'bad'),
+    kpi('RLV @ NPV = 0 ('+T.discount+'%)', fm(rlvN), sub(rlvN), rlvN!=null&&rlvN>=R.landPrice?'good':'bad'),
+  ].join('');
+
+  // chart
+  const W=640,Hh=280,pad={l:52,r:52,t:10,b:30}, N=24, xmax = Math.max(R.landPrice*2.5, (rlvM||0)*1.3, (rlvI||0)*1.3, 1);
+  const pts = Array.from({length:N+1},(_,k)=>{ const x=xmax*k/N, m=model(S,{landPrice:x}); return {x, m:m.margin, i:m.pIRR}; });
+  const vals = pts.flatMap(p=>[p.m,p.i]).filter(v=>v!=null).concat([T.margin/100,T.irr/100,0]);
+  const ymin=Math.min(...vals), ymax=Math.max(...vals);
+  const X = x => pad.l + x/xmax*(W-pad.l-pad.r), Y = v => pad.t + (ymax-v)/(ymax-ymin||1)*(Hh-pad.t-pad.b);
+  let s = '';
+  for(let k=0;k<=4;k++){ const v=ymin+(ymax-ymin)*k/4; s+=`<line x1="${pad.l}" x2="${W-pad.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--ink-hairline)"/><text x="${pad.l-6}" y="${Y(v)+3}" text-anchor="end">${fpct(v,0)}</text>`; }
+  for(let k=0;k<=5;k++){ const x=xmax*k/5; s+=`<text x="${X(x)}" y="${Hh-pad.b+16}" text-anchor="middle">${fm(x)}</text>`; }
+  s += `<line x1="${pad.l}" x2="${W-pad.r}" y1="${Y(T.margin/100)}" y2="${Y(T.margin/100)}" stroke="var(--rev)" stroke-dasharray="3 3" opacity=".5"/>`;
+  s += `<line x1="${pad.l}" x2="${W-pad.r}" y1="${Y(T.irr/100)}" y2="${Y(T.irr/100)}" stroke="var(--debt)" stroke-dasharray="3 3" opacity=".5"/>`;
+  s += `<line x1="${X(R.landPrice)}" x2="${X(R.landPrice)}" y1="${pad.t}" y2="${Hh-pad.b}" stroke="var(--ink)"/><text x="${X(R.landPrice)+4}" y="${pad.t+10}" text-anchor="start" style="fill:var(--ink)">current</text>`;
+  const pl = (k,col) => `<polyline fill="none" stroke="${col}" stroke-width="2" points="${pts.filter(p=>p[k]!=null).map(p=>`${X(p.x)},${Y(p[k])}`).join(' ')}"/>`;
+  s += pl('m','var(--rev)') + pl('i','var(--debt)');
+  $('chRes').innerHTML = s;
+
+  // breakeven
+  const beRev = solve(m => model(S,{revMult:m}).profit, 0.01, 2, 0, true);
+  const beCon = solve(m => model(S,{conMult:m}).profit, 0, 5, 0, false);
+  const beRate = solve(a => model(S,{rateAdd:a}).profit, -10, 100, 0, false);
+  $('beKpis').innerHTML = [
+    kpi('Revenue can fall by', beRev==null?'–':fpct(1-beRev), 'before profit reaches zero'),
+    kpi('Construction can rise by', beCon==null?'–':fpct(beCon-1), 'before profit reaches zero'),
+    kpi('Interest rates can rise by', beRate==null?'> 100 pts':(beRate).toFixed(1)+' pts', 'before profit reaches zero'),
+    kpi('Breakeven sale rate', beRev==null?'–':fmt(beRev*sum(S.sales.map(s=>num(s.units)*num(s.area)*num(s.rate)))/Math.max(1,sum(S.sales.map(s=>num(s.units)*num(s.area))))), c+' /m² (today’s value)'),
+  ].join('');
+}
+
+/* =================== PERSISTENCE =================== */
+const LS = 'bohio-feas-v1';
+function store(){ try{ return JSON.parse(localStorage.getItem(LS)||'{}'); }catch(e){ return {}; } }
+function persist(all){ try{ localStorage.setItem(LS, JSON.stringify(all)); }catch(e){} }
+function load(){ const a=store(); return a.current && a.scenarios && a.scenarios[a.current] ? JSON.parse(JSON.stringify(a.scenarios[a.current])) : null; }
+function renderScen(){
+  const a = store(), names = Object.keys(a.scenarios||{});
+  $('scenSel').innerHTML = (names.length? '' : '<option value="">Unsaved scenario</option>') + names.map(n=>`<option ${n===a.current?'selected':''}>${esc(n)}</option>`).join('');
+}
+function saveAs(name){ const a = store(); a.scenarios = a.scenarios||{}; a.scenarios[name] = S; a.current = name; persist(a); renderScen(); }
+function download(name, text, type){ const b=new Blob([text],{type}); const u=URL.createObjectURL(b); const x=document.createElement('a'); x.href=u; x.download=name; x.click(); setTimeout(()=>URL.revokeObjectURL(u),1000); }
+let autosaveT;
+function autosave(){ clearTimeout(autosaveT); autosaveT = setTimeout(()=>{ const a=store(); if(a.current){ a.scenarios[a.current]=S; persist(a);} }, 600); }
+
+/* =================== WIRING =================== */
+let renderT;
+function changed(){ clearTimeout(renderT); renderT = setTimeout(render, 120); autosave(); }
+function refreshAll(){ renderForms(); renderTables(); render(); renderScen(); }
+
+$('tabs').addEventListener('click', e => { const b=e.target.closest('.tab'); if(!b) return;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t===b));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='v-'+b.dataset.v));
+  if(b.dataset.v==='sensitivity') renderSens(); if(b.dataset.v==='residual') renderResidual();
+});
+$('addSale').onclick = () => { S.sales.push({name:'New unit type',units:10,area:100,rate:8000,start:30,span:6}); renderTables(); changed(); };
+$('addLease').onclick = () => { S.leases.push({name:'New tenancy',nla:500,rent:1000,occ:95,cap:8,purch:2.5,start:30,sale:36}); renderTables(); changed(); };
+$('addCost').onclick = () => { S.costs.push({cat:'Other',name:'New cost',basis:'lump',qty:1,value:100000,curve:'straight',start:0,span:12,esc:false}); renderTables(); changed(); };
+$('cfPeriod').addEventListener('click', e => { const b=e.target.closest('button'); if(!b) return; cfP=+b.dataset.p;
+  [...$('cfPeriod').children].forEach(x=>x.classList.toggle('on',x===b)); renderCF(); });
+$('sensOut').addEventListener('click', e => { const b=e.target.closest('button'); if(!b) return; sensOut=b.dataset.o;
+  [...$('sensOut').children].forEach(x=>x.classList.toggle('on',x===b)); renderSens(); });
+$('sensStep').onchange = renderSens;
+$('btnCsv').onclick = exportCSV;
+$('btnSave').onclick = () => { const a=store(); if(a.current) saveAs(a.current); else { const n=prompt('Scenario name', S.project.name||'Scenario'); if(n) saveAs(n); } };
+$('btnSaveAs').onclick = () => { const n=prompt('Save scenario as', (S.project.name||'Scenario')+' – option'); if(n) saveAs(n); };
+$('btnDel').onclick = () => { const a=store(); if(!a.current || !confirm('Delete scenario “'+a.current+'”?')) return; delete a.scenarios[a.current]; a.current = Object.keys(a.scenarios)[0]||null; persist(a); if(a.current) S=load(); refreshAll(); };
+$('scenSel').onchange = e => { const a=store(); if(!a.scenarios||!a.scenarios[e.target.value]) return; a.current=e.target.value; persist(a); S=load(); refreshAll(); };
+$('btnExport').onclick = () => download((S.project.name||'feasibility')+'.json', JSON.stringify(S,null,2), 'application/json');
+$('fileImport').onchange = e => { const f=e.target.files[0]; if(!f) return; f.text().then(t=>{ try{ const d=JSON.parse(t); if(!d.project||!d.costs) throw 0; S=d; refreshAll(); }catch(_){ alert('Not a valid feasibility file.'); } }); e.target.value=''; };
+$('btnReset').onclick = () => { if(confirm('Load the example project? Unsaved changes to the current scenario will be replaced.')){ S=EXAMPLE(); const a=store(); a.current=null; persist(a); refreshAll(); } };
+
+refreshAll();
+</script>
+</body>
+</html>
