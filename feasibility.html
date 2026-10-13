@@ -3,13 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bohio · Development Feasibility</title>
+<title>Bohio Feasibility</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#ffffff; --ink:#000919; --ink-soft:rgba(0,9,25,0.55); --ink-faint:rgba(0,9,25,0.30);
     --ink-hairline:rgba(0,9,25,0.12); --paper:#f6f4f4; --alert:#d6304d; --good:#15803d; --warn:#b45309;
     --rev:#0f5c8c; --cost:#000919; --debt:#b45309; --equity:#15803d;
+  }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+    --bg:#0d1117; --ink:#e8ebf0; --ink-soft:rgba(232,235,240,0.62); --ink-faint:rgba(232,235,240,0.35);
+    --ink-hairline:rgba(232,235,240,0.14); --paper:#161b22; --alert:#f0657e; --good:#3fb96b; --warn:#e0954a;
+    --rev:#4c9fd6; --cost:#c9ced6; --debt:#e0954a; --equity:#3fb96b;
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0d1117; --ink:#e8ebf0; --ink-soft:rgba(232,235,240,0.62); --ink-faint:rgba(232,235,240,0.35);
+    --ink-hairline:rgba(232,235,240,0.14); --paper:#161b22; --alert:#f0657e; --good:#3fb96b; --warn:#e0954a;
+    --rev:#4c9fd6; --cost:#c9ced6; --debt:#e0954a; --equity:#3fb96b;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{background:var(--bg);color:var(--ink);font-family:'Space Grotesk',-apple-system,sans-serif;letter-spacing:.01em;min-height:100vh}
@@ -787,7 +797,11 @@ function renderScen(){
   $('scenSel').innerHTML = (names.length? '' : '<option value="">Unsaved scenario</option>') + names.map(n=>`<option ${n===a.current?'selected':''}>${esc(n)}</option>`).join('');
 }
 function saveAs(name){ const a = store(); a.scenarios = a.scenarios||{}; a.scenarios[name] = S; a.current = name; persist(a); renderScen(); }
-function download(name, text, type){ const b=new Blob([text],{type}); const u=URL.createObjectURL(b); const x=document.createElement('a'); x.href=u; x.download=name; x.click(); setTimeout(()=>URL.revokeObjectURL(u),1000); }
+async function download(name, text, type){
+  // Inside the claude.ai viewer, saves go through the downloads capability; elsewhere a plain blob link works.
+  const dl = window.claude?.use ? await window.claude.use('downloads').catch(()=>null) : null;
+  if(dl){ try{ await dl.save({filename:name, data:text}); }catch(e){ if(e?.code!=='declined') alert('Download unavailable here.'); } return; }
+  const b=new Blob([text],{type}); const u=URL.createObjectURL(b); const x=document.createElement('a'); x.href=u; x.download=name; x.click(); setTimeout(()=>URL.revokeObjectURL(u),1000); }
 let autosaveT;
 function autosave(){ clearTimeout(autosaveT); autosaveT = setTimeout(()=>{ const a=store(); if(a.current){ a.scenarios[a.current]=S; persist(a);} }, 600); }
 
