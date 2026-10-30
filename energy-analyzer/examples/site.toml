@@ -1,0 +1,63 @@
+# Site configuration for `energy-analyzer analyze --site examples/site.toml ...`
+# Matches the synthetic building from `energy-analyzer demo --write-inputs`.
+
+name = "Example Office"
+latitude = 40.71
+longitude = -74.01
+timezone = "America/New_York"
+floor_area_m2 = 4500
+
+# Real sites: pull tariffs from OpenEI's Utility Rate Database (needs OPENEI_API_KEY)
+# tariff_label = "5cd1bd4b5457a3b85b3c1e2a"
+# candidate_tariff_labels = ["...", "..."]
+# search_openei_tariffs = true   # compare against every current commercial rate at this location
+
+[schedule]
+weekdays = [0, 1, 2, 3, 4]   # Monday=0
+open = "07:00"
+close = "19:00"
+# The synthetic demo building runs on holidays, so none are listed. For a real site:
+# holidays = ["2025-01-01", "2025-05-26", "2025-07-04", "2025-09-01", "2025-11-27", "2025-12-25"]
+
+# Or define tariffs inline:
+[tariff]
+name = "GS-TOU (current)"
+fixed_monthly = 95.0
+energy_rates = [[{ rate = 0.11 }], [{ rate = 0.19 }]]
+flat_demand_rates = [[{ rate = 16.0 }]]
+# 12 months x 24 hours -> energy period index; period 1 = summer weekday 12:00-18:00
+energy_weekday_schedule = [
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+]
+
+[[candidate_tariffs]]
+name = "GS-Flat"
+fixed_monthly = 60.0
+energy_rates = [[{ rate = 0.165 }]]
+
+[[candidate_tariffs]]
+name = "GS-LoadFactor"
+fixed_monthly = 150.0
+energy_rates = [[{ rate = 0.085 }]]
+flat_demand_rates = [[{ rate = 24.0 }]]
+
+[assumptions]
+hvac_setback_realization = 0.7
+
+[assumptions.implementation_cost_usd]
+baseload = 3000
+after_hours_hvac = 1500
+demand_peaks = 2500
+drift = 2000
+tariff_switch = 0
