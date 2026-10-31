@@ -1,0 +1,19 @@
+{
+  "name": "skydesk-jet-crm",
+  "version": "1.0.0",
+  "description": "Private jet charter broker CRM: Outlook inbox to automatic RFQs",
+  "main": "server.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "private": true
+}

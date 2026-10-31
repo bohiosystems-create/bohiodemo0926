@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: skydesk-crm
+    runtime: node
+    plan: starter            # needs an always-on instance for the 60-second inbox poll
+    buildCommand: npm ci --omit=dev
+    startCommand: node server.js
+    envVars:
+      - key: DATA_DIR
+        value: /data
+      - key: MS_CLIENT_ID
+        sync: false
+      - key: MS_CLIENT_SECRET
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+    disk:
+      name: skydesk-data
+      mountPath: /data
+      sizeGB: 1
