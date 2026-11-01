@@ -94,7 +94,7 @@ function pdf(inv) {
     const chunks = [];
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
-    const s = inv.seller, gold = '#9a7b3a', ink = '#111827', mute = '#6b7280';
+    const s = inv.seller, gold = '#000000', ink = '#000000', mute = '#555555';
     const W = doc.page.width - 100;
 
     doc.fillColor(ink).font('Helvetica-Bold').fontSize(20).text(s.name || 'Bohio', 50, 50, { width: W * 0.6 });

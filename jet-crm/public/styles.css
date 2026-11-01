@@ -1,9 +1,10 @@
 :root {
   /* Light green sky, white cards, deep tail-green accent. --gold is the accent token (kept for compatibility). */
-  --bg: #f4f6f9; --bg-2: #e7edf3; --surface: #ffffff; --surface-2: #f1f4f7; --line: #dfe6ec; --field: #f6f8fa;
-  --text: #14211a; --muted: #6b7a71; --gold: #0d6b3e; --gold-ink: #ffffff;
-  --blue: #2c64c7; --green: #128a50; --red: #c8323a; --amber: #a86a12;
-  --shadow: 0 1px 2px rgba(20, 50, 30, .05), 0 6px 18px rgba(20, 50, 30, .06);
+  /* Black on white only. --gold is the accent token (kept for compatibility): black. */
+  --bg: #ffffff; --bg-2: #ffffff; --surface: #ffffff; --surface-2: #f4f4f4; --line: #e2e2e2; --field: #ffffff;
+  --text: #000000; --muted: #555555; --gold: #000000; --gold-ink: #ffffff;
+  --blue: #000000; --green: #000000; --red: #000000; --amber: #000000;
+  --shadow: none;
   --radius: 16px; --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px);
   --font: "Manrope", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color-scheme: light;
@@ -193,3 +194,40 @@ h3 { color: #4f6a5a; }
 .rfq-item small { display: block; color: var(--muted); font-size: 11.5px; font-weight: 500; }
 .mail-head span { margin-right: 6px; }
 .meta .sep { color: var(--line); }
+
+/* ---- black on white: every remaining colour neutralised ---- */
+#bgimg { background-color: #fff; filter: grayscale(1) contrast(1.05); }
+#bgfade { background: linear-gradient(to bottom, rgba(255,255,255,0) 52vh, rgba(255,255,255,.94) 64vh, #fff 76vh) !important; }
+@media (min-aspect-ratio: 13/10) { #bgfade { background: linear-gradient(to bottom, rgba(255,255,255,0) 46vh, rgba(255,255,255,.94) 60vh, #fff 74vh) !important; } }
+body.solid #bgfade { background: linear-gradient(to bottom, rgba(255,255,255,.85) 0, rgba(255,255,255,.97) 24vh, #fff 42vh) !important; }
+.dot.ok { background: #000; box-shadow: none; } .dot.err { background: #000; outline: 2px solid #000; outline-offset: 2px; } .dot.spin { background: #777; }
+.tabs { background: #fff; border-top: 1px solid #000; }
+.tabs a { color: #8a8a8a; } .tabs a.on { color: #000; }
+.badge, .badge.new, .badge.rfq_sent, .badge.quoting, .badge.proposal, .badge.won, .badge.sent, .badge.selected, .badge.lost, .badge.failed, .badge.simulated,
+.badge.inv-issued, .badge.inv-sent, .badge.inv-void, .badge.web { background: #fff; color: #000; border: 1px solid #000; }
+.badge.won, .badge.selected, .badge.inv-paid { background: #000; color: #fff; border: 1px solid #000; }
+.best { color: #000; text-decoration: underline; text-underline-offset: 3px; }
+.card, .stat { border: 1px solid #000; box-shadow: none; }
+.card .card { border-color: var(--line); }
+.card.is-best { border: 2px solid #000; }
+.chip { background: #fff; border: 1px solid #000; color: #000; box-shadow: none; } .chip.on { background: #000; color: #fff; }
+.btn { background: #fff; border: 1px solid #000; color: #000; } .btn.primary { background: #000; color: #fff; box-shadow: none; } .btn.danger { color: #000; }
+.fab { background: #000; color: #fff; box-shadow: none; }
+input, textarea, select { background: #fff; border-color: #bdbdbd; color: #000; }
+input:focus, textarea:focus, select:focus { border-color: #000; box-shadow: 0 0 0 2px #000; }
+.switch span { background: #cfcfcf; } .switch input:checked + span { background: #000; }
+.avatar { background: #fff; color: #000; border: 1px solid #000; }
+.banner { background: #fff; border: 1px solid #000; color: #000; }
+.sheet { background: rgba(0,0,0,.35); } .sheet-card { box-shadow: none; border-top: 1px solid #000; }
+.sheet-close { background: #fff; border-color: #000; color: #000; }
+.toast { background: #000; color: #fff; }
+.sync { background: #fff; border: 1px solid #000; color: #000; box-shadow: none; }
+h3 { color: #000; } .muted, .small.muted { color: var(--muted); }
+.tbc, .code { color: #555; }
+.fxnote { background: #f4f4f4; color: #333; }
+.pricegrid .price { color: #000; }
+.route .arrow, .leg .arrow { color: #000; } .leg::before { background: #000; }
+.invoice { background: #fff; color: #000; border: 1px solid #000; }
+.inv-title { color: #000; } .inv-small, .inv-table th, .inv-table .sub td { color: #555; }
+.inv-table, .inv-table td, .inv-table .tot td { color: #000; } .inv-table .tot td { border-top-color: #000; }
+a[style*="color"], span[style*="color"], div[style*="color"], small[style*="color"] { color: #000 !important; }
