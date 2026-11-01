@@ -41,6 +41,13 @@ function endpointHtml(e) {
   if (e.status === 'city') return `<b>${esc(e.city.name)}</b> <span class="tbc">airport not specified · ${e.options.length} airports</span>`;
   return `<b>${esc(e.text)}</b> <span class="tbc">airport not recognised</span>`;
 }
+const minsLeft = (iso) => Math.max(0, Math.ceil((Date.parse(iso) - Date.now()) / 60000));
+function offerState(r) {
+  if (r.proposal?.status === 'pending') return { kind: 'pending', text: 'Offer ready: needs your approval' };
+  if (r.proposal?.status === 'sent') return { kind: 'sent', text: `Offer sent ${ago(r.proposal.sentAt)}` };
+  if (r.quoteWindow) { const m = minsLeft(r.quoteWindow.closesAt); return { kind: 'window', text: m ? `Collecting quotes · ${m} min left` : 'Picking the best quote…' }; }
+  return null;
+}
 const initials = (n) => (n || '?').split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
 function routeHtml(r) {
   if (!r.legs?.length) return '<span class="muted">Route TBC</span>';
@@ -82,6 +89,7 @@ function connectLive() {
       const e = JSON.parse(m.data);
       if (e.type === 'request') toast('✈ New charter request received');
       if (e.type === 'quote') toast('New quote received');
+      if (e.type === 'proposal') toast('Offer ready for your approval');
       clearTimeout(connectLive.t);
       connectLive.t = setTimeout(() => { refreshState(); if (!$('#sheet').hidden || document.activeElement?.matches('input,textarea,select')) return; route(); }, 400);
     };
@@ -99,6 +107,7 @@ async function renderRequests() {
   const shown = [...open, ...reqs.filter((r) => !open.includes(r))]; // open trips first, then won/lost
   view.innerHTML = `
     <div class="hero" aria-hidden="true"></div>
+    ${(() => { const p = reqs.filter((r) => r.proposal?.status === 'pending'); return p.length ? `<a class="card approve-cta" href="#/req/${p[0].id}"><b>${p.length} offer${p.length === 1 ? '' : 's'} waiting for your approval</b><span class="small muted">The agent picked the best quote${p.length === 1 ? '' : 's'}. Review the price and fee before it goes to the client.</span></a>` : ''; })()}
     <div class="stats">
       <div class="stat"><b>${open.length}</b><span>Open requests</span></div>
       <div class="stat"><b>${reqs.reduce((n, r) => n + r.quotes.length, 0)}</b><span>Quotes in</span></div>
@@ -111,6 +120,7 @@ async function renderRequests() {
         <div class="row between"><span class="small muted">${esc(r.ref)} · ${ago(r.createdAt)}</span><span class="badge ${r.status}">${STATUS[r.status]}</span></div>
         <div class="route" style="margin-top:6px">${routeHtml(r)}</div>
         <div class="meta"><span>${fmtDate(r.legs[0]?.date)}</span><span>${r.pax ?? '?'} pax</span>${r.category ? `<span>${esc(r.category)}</span>` : ''}<span>${esc(r.client?.name || r.client?.email || '')}</span></div>
+        ${offerState(r) ? `<div class="offer-line ${offerState(r).kind}">${esc(offerState(r).text)}</div>` : ''}
         <div class="meta"><span>${r.rfqCount || 0} RFQ${r.rfqCount === 1 ? '' : 's'} sent</span><span>${r.quotes.length} quote${r.quotes.length === 1 ? '' : 's'}</span>${best ? `<span style="color:var(--green)">Best ${money(best.clientPriceTarget, Pricing.clientCurrency(r, state.business))} to client</span>` : ''}${tbc ? '<span class="tbc">airport to confirm</span>' : ''}</div>
       </a>`;
     }).join('') : `<div class="empty">No requests here yet.<br><span class="small">New charter enquiries arriving in your inbox appear automatically.</span></div>`}
@@ -186,6 +196,7 @@ async function renderRequest(id) {
     <div class="card row"><div class="avatar">${initials(r.client?.name)}</div><div class="grow"><b>${esc(r.client?.name || 'Unknown')}</b><div class="small muted">${esc(r.client?.company || '')} ${esc(r.client?.email || '')}</div></div>
       ${r.client?.phone ? `<a class="btn sm" href="tel:${esc(r.client.phone)}">Call</a>` : ''}${r.client?.email ? `<a class="btn sm" href="mailto:${esc(r.client.email)}?subject=${encodeURIComponent('Your charter: ' + r.legs.map((l) => l.from + '-' + l.to).join(', '))}">Email</a>` : ''}</div>
 
+    ${offerCard(r)}
     <div class="row between"><h3>Quote comparison (${quotes.length})</h3><button class="chip" id="fee">Fee ${esc(feeLabel)}${r.fee ? '' : ' · default'}</button></div>
     ${cmp.missingRates.length ? `<div class="banner">No exchange rate for ${cmp.missingRates.join(', ')}, so ${cmp.missingRates.length === 1 ? 'that quote' : 'those quotes'} can't be compared in ${esc(cmp.target)}. Refresh rates or add one in Settings → Tax & currency.</div>` : ''}
     ${cmp.mixedCurrencies || quotes.some((q) => q.converted) ? `<div class="small muted" style="margin:-4px 0 8px">Client prices converted to ${esc(cmp.target)}${biz.fxBufferPct ? ` with a ${biz.fxBufferPct}% FX buffer` : ''} · rates ${biz.fxUpdatedAt ? `${esc(biz.fxSource)}, ${ago(biz.fxUpdatedAt)}` : 'entered manually'}</div>` : ''}
@@ -239,6 +250,8 @@ async function renderRequest(id) {
     <button class="btn danger block" style="margin-top:24px" id="del">Delete request</button>`;
 
   $('#status').onchange = async (e) => { await api(`/requests/${id}`, { method: 'PATCH', body: { status: e.target.value } }); toast('Status updated'); };
+  const ap = $('#approve'); if (ap) ap.onclick = () => approveSheet(r);
+  const pn = $('#pickNow'); if (pn) pn.onclick = async () => { await api(`/requests/${id}/proposal/now`, { method: 'POST' }); renderRequest(id); };
   view.querySelectorAll('[data-issue]').forEach((b) => (b.onclick = () => issueSheet(r, quotes.find((q) => q.id === b.dataset.issue))));
   view.querySelectorAll('[data-inv]').forEach((b) => (b.onclick = async () => invoiceSheet(await api(`/invoices/${b.dataset.inv}`))));
   view.querySelectorAll('[data-qedit]').forEach((b) => (b.onclick = () => quoteEditSheet(r, r.quotes.find((q) => q.id === b.dataset.qedit))));
@@ -279,6 +292,66 @@ async function renderRequest(id) {
     <button class="btn primary block" style="margin-top:12px" id="sv">Save</button>`, (root) => {
     wireLegs(root);
     $('#sv').onclick = async () => { await api(`/requests/${id}`, { method: 'PATCH', body: { legs: readLegs(root), pax: +$('#px').value || null, category: $('#cat').value || null, notes: $('#nt').value || null } }); closeSheet(); renderRequest(id); };
+  });
+}
+
+function offerCard(r) {
+  const p = r.proposal, w = r.quoteWindow;
+  if (p?.status === 'pending') return `<h3>Offer to client</h3><div class="card offer pending">
+      <div class="small muted">Recommended after ${p.quotesConsidered} quote${p.quotesConsidered === 1 ? '' : 's'}${p.updatedAt ? ' · updated ' + ago(p.updatedAt) : ''}</div>
+      <div class="offer-main"><b>${esc(p.company)}</b><span>${esc(p.aircraft || 'Aircraft TBC')}</span></div>
+      <div class="offer-price">${money(p.clientPrice, p.currency)} <span class="small muted">to client at ${p.feePct}% fee</span></div>
+      <div class="small" style="margin-top:6px">${esc(p.why)}</div>
+      <button class="btn primary block" style="margin-top:12px" id="approve">Review & approve</button>
+      <div class="small muted" style="margin-top:6px">Nothing is sent to the client until you approve.</div></div>`;
+  if (p?.status === 'sent') return `<h3>Offer to client</h3><div class="card offer">
+      <div class="row between"><b>${esc(p.company)} · ${esc(p.aircraft || '')}</b><span class="badge selected">sent${p.simulated ? ' (demo)' : ''}</span></div>
+      <div class="offer-price">${money(p.clientPrice, p.currency)} <span class="small muted">at ${p.feePct}% fee · approved ${ago(p.approvedAt)}</span></div>
+      <details class="rfq-item"><summary><span class="grow">Email sent to ${esc(r.client?.email || '')}<small>${esc(p.subject)}</small></span><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="mail"><div class="email-src">${esc(p.body)}</div></div></details></div>`;
+  if (w) {
+    const m = minsLeft(w.closesAt);
+    return `<h3>Offer to client</h3><div class="card offer">
+      <b>${m ? `Collecting quotes · ${m} min left` : 'Picking the best quote…'}</b>
+      <div class="small muted" style="margin-top:4px">The window opened with the first quote ${ago(w.opensAt)}. When it closes, the agent recommends the best quote on price and fit to the request, and asks for your approval.</div>
+      ${r.quotes.length ? `<button class="btn block" style="margin-top:10px" id="pickNow">Recommend now (${r.quotes.length} quote${r.quotes.length === 1 ? '' : 's'} in)</button>` : ''}</div>`;
+  }
+  return '';
+}
+
+function approveSheet(r) {
+  const biz = state.business, needs = r.routing?.needs || { pax: r.pax, category: r.category };
+  let feePct = r.proposal.feePct ?? biz.feeValue, chosen = r.proposal.quoteId, edited = false;
+  const draw = (root) => {
+    const ev = Proposal.evaluate(r, biz, needs, feePct);
+    const row = ev.rows.find((x) => x.id === chosen) || ev.best;
+    const draft = Proposal.draftEmail(r, row, biz, { senderName: state.settings.senderName, routeText: r.legs.map((l) => `${l.from} → ${l.to}`).join(', ') });
+    $('#ap_list', root).innerHTML = ev.rows.map((x) => `<label class="ap-row ${x.disqualified ? 'dq' : ''}"><input type="radio" name="ap" value="${x.id}" ${x.id === row.id ? 'checked' : ''} ${x.disqualified ? 'disabled' : ''} style="width:auto">
+      <div class="grow"><div class="row between"><b>${esc(x.company)}</b><b>${x.clientPriceTarget != null ? money(x.clientPriceTarget, ev.target) : '—'}</b></div>
+      <div class="small muted">${esc([x.aircraft, x.year && 'YOM ' + x.year].filter(Boolean).join(' · ') || 'Aircraft not stated')}${x.id === ev.best?.id ? ' · <b>agent\'s pick</b>' : ''}</div>
+      ${x.disqualified ? `<div class="small">Not offered: ${esc(x.disqualified)}</div>` : ''}${x.penalties.length && !x.disqualified ? `<div class="small">Watch: ${esc(x.penalties.map((p) => p.text).join(', '))}</div>` : ''}${x.notes.length ? `<div class="small muted">${esc(x.notes.join(', '))}</div>` : ''}</div></label>`).join('');
+    $('#ap_sum', root).innerHTML = `<div class="row between"><span>Operator price</span><b>${money(row.price, row.currency)}</b></div>
+      <div class="row between"><span>Your fee (${feePct}%)</span><b>${money(row.fee, row.currency)}</b></div>
+      <div class="row between" style="font-size:18px;margin-top:6px"><span>Client pays</span><b>${money(row.clientPriceTarget, ev.target)}</b></div>`;
+    if (!edited) { $('#ap_subj', root).value = draft.subject; $('#ap_body', root).value = draft.body; }
+    root.querySelectorAll('input[name=ap]').forEach((i) => (i.onchange = () => { chosen = i.value; edited = false; draw(root); }));
+  };
+  sheet(`<h2>Approve offer</h2><p class="small muted">${esc(r.ref)} · ${esc(r.client?.name || '')} · ${r.quotes.length} quote${r.quotes.length === 1 ? '' : 's'} ranked by client price and fit to the request.</p>
+    <h3>Quote</h3><div id="ap_list"></div>
+    <h3>Brokerage fee</h3><div class="row"><input id="ap_fee" type="number" step="0.5" min="0" max="50" value="${feePct}" style="max-width:110px"><span>%</span><span class="small muted grow">Standard is ${biz.feeValue}%.</span></div>
+    <div class="card" id="ap_sum" style="margin-top:10px"></div>
+    <h3>Email to ${esc(r.client?.email || 'client')}</h3>
+    <input id="ap_subj"><textarea id="ap_body" style="min-height:240px;margin-top:8px"></textarea>
+    <div class="small muted">The operator's name and tail number are not shown to the client.</div>
+    <button class="btn primary block" style="margin-top:12px" id="ap_go">Approve fee & send offer</button>`, (root) => {
+    $('#ap_fee').oninput = (e) => { feePct = Math.max(0, +e.target.value || 0); edited = false; draw(root); };
+    ['ap_subj', 'ap_body'].forEach((k) => ($('#' + k).oninput = () => (edited = true)));
+    $('#ap_go').onclick = async () => {
+      try {
+        await api(`/requests/${r.id}/proposal/approve`, { method: 'POST', body: { quoteId: chosen, feePct, subject: $('#ap_subj').value, body: $('#ap_body').value } });
+        closeSheet(); toast('Offer sent to the client'); renderRequest(r.id);
+      } catch (e) { toast(e.message); }
+    };
+    draw(root);
   });
 }
 
@@ -568,6 +641,7 @@ async function renderSettings() {
     <h3>Client replies & operator follow-ups</h3>
     <div class="card">
       <div class="row between"><div class="grow"><b>Reply to the client instantly</b><div class="small muted">As soon as a request arrives, reply in the client's email thread to confirm you're on it.</div></div><label class="switch"><input type="checkbox" id="ack_on" ${s.autoAck ? 'checked' : ''}><span></span></label></div>
+      <label>Wait for more quotes before recommending one (minutes after the first quote)</label><input id="qw_min" type="number" min="0" max="240" value="${s.quoteWindowMinutes ?? 30}">
       <label>Reply text</label><textarea id="ack_tpl" style="min-height:200px">${esc(s.ackTemplate || '')}</textarea>
       <div class="small muted">Placeholders: {{clientFirstName}} {{clientName}} {{ref}} {{route}} {{date}} {{pax}} {{senderName}}</div>
       <div class="row between" style="margin-top:16px"><div class="grow"><b>Chase operators who haven't replied</b><div class="small muted">Sends a short follow-up in the same thread until they reply, the trip moves to Proposal/Won/Lost, or the limit is reached.</div></div><label class="switch"><input type="checkbox" id="fu_on" ${s.followUp?.enabled ? 'checked' : ''}><span></span></label></div>
@@ -597,7 +671,7 @@ Alexander Grant
     <p class="small muted" style="text-align:center;margin-top:26px">Tip: on your phone, use "Add to Home Screen" to install SkyDesk as an app.</p>`;
 
   $('#acksv').onclick = async () => {
-    state = await api('/settings', { method: 'PUT', body: { autoAck: $('#ack_on').checked, ackTemplate: $('#ack_tpl').value, followUp: { enabled: $('#fu_on').checked, everyMinutes: +$('#fu_every').value, maxPerOperator: +$('#fu_max').value } } });
+    state = await api('/settings', { method: 'PUT', body: { quoteWindowMinutes: +$('#qw_min').value, autoAck: $('#ack_on').checked, ackTemplate: $('#ack_tpl').value, followUp: { enabled: $('#fu_on').checked, everyMinutes: +$('#fu_every').value, maxPerOperator: +$('#fu_max').value } } });
     toast('Saved');
   };
   $('#auto').onchange = async (e) => { await api('/settings', { method: 'PUT', body: { autoSendRfq: e.target.checked } }); toast(e.target.checked ? 'Auto-RFQ on' : 'Auto-RFQ off'); };

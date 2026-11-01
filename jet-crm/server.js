@@ -175,6 +175,11 @@ async function api(req, res, url) {
       engine.drainOutbox();
       return send(res, 200, { queued: n });
     }
+    if (c === 'proposal' && d === 'approve' && M === 'POST') {
+      try { return send(res, 200, await engine.approveProposal(r, await readBody(req))); }
+      catch (e) { return send(res, e.status || 500, { error: e.message }); }
+    }
+    if (c === 'proposal' && d === 'now' && M === 'POST') { engine.proposeNow(r); return send(res, 200, r); }
     if (c === 'invoice' && M === 'POST') {
       const { quoteId } = await readBody(req);
       try { return send(res, 201, invoices.create(r, quoteId)); }
@@ -298,6 +303,7 @@ async function api(req, res, url) {
   if (a === 'settings' && M === 'PUT') {
     const body = await readBody(req);
     Object.assign(db.settings, pick(body, ['autoSendRfq', 'senderName', 'autoAck']));
+    if (body.quoteWindowMinutes !== undefined) db.settings.quoteWindowMinutes = Math.max(0, Math.min(240, Number(body.quoteWindowMinutes) || 0));
     if (typeof body.ackTemplate === 'string' && body.ackTemplate.trim()) db.settings.ackTemplate = body.ackTemplate;
     if (body.followUp) db.settings.followUp = { enabled: Boolean(body.followUp.enabled), everyMinutes: Math.max(5, Number(body.followUp.everyMinutes) || 15), maxPerOperator: Math.max(1, Math.min(10, Number(body.followUp.maxPerOperator) || 3)) };
     if (body.routing) {

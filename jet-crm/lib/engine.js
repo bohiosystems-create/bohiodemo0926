@@ -4,6 +4,7 @@ const graph = require('./graph');
 const { parseEmail } = require('./parser');
 const routing = require('./routing');
 const geo = require('./geo');
+const Proposal = require('../public/shared/proposal');
 
 const SENDS_PER_MINUTE = Number(process.env.SENDS_PER_MINUTE || 25); // Exchange Online caps at 30/min
 const listeners = new Set();
@@ -115,6 +116,76 @@ async function acknowledge(req, email) {
 }
 
 // ---------- chase operators who haven't replied ----------
+// ---------- proposals: collect quotes for a while, pick the best, wait for the broker's approval ----------
+const legText = (req) => req.legs.map((l) => { const e = (t, c) => { const x = geo.endpoint(t, c); return x.status === 'airport' ? `${x.airport.city || x.airport.name} (${x.airport.iata || x.airport.icao})` : t; }; return `${e(l.from, l.fromCode)} → ${e(l.to, l.toCode)}`; }).join(', ');
+function openQuoteWindow(req) {
+  if (req.quoteWindow || req.proposal) return;
+  const mins = Number(store.load().settings.quoteWindowMinutes) || 30;
+  const now = Date.now();
+  req.quoteWindow = { opensAt: new Date(now).toISOString(), closesAt: new Date(now + mins * 60000).toISOString() };
+  store.log('proposal', `${req.ref}: first quote in, collecting more for ${mins} minutes before recommending one`, { requestId: req.id });
+}
+function buildProposal(req, { feePct } = {}) {
+  const db = store.load();
+  const ev = Proposal.evaluate(req, db.business, routing.tripNeeds(req), feePct);
+  if (!ev.best) return null;
+  const draft = Proposal.draftEmail(req, ev.best, db.business, { senderName: db.settings.senderName, routeText: legText(req) });
+  return { quoteId: ev.best.id, company: ev.best.company, aircraft: ev.best.aircraft, clientPrice: ev.best.clientPriceTarget, currency: ev.target,
+    feePct: ev.fee.value, why: Proposal.why(ev), quotesConsidered: req.quotes.length, subject: draft.subject, body: draft.body };
+}
+function runProposals() {
+  const db = store.load();
+  let changed = 0;
+  for (const req of db.requests) {
+    if (!req.quotes.some((q) => q.price != null)) continue;
+    if (!req.quoteWindow && !req.proposal) { openQuoteWindow(req); changed++; }
+    const p = req.proposal;
+    if (!p && req.quoteWindow && Date.now() >= Date.parse(req.quoteWindow.closesAt)) {
+      const rec = buildProposal(req);
+      if (!rec) continue;
+      req.proposal = { status: 'pending', createdAt: new Date().toISOString(), ...rec };
+      store.log('proposal', `${req.ref}: recommending ${rec.company} (${rec.aircraft || 'aircraft TBC'}), ${rec.currency} ${Math.round(rec.clientPrice).toLocaleString('en-US')} to client. Waiting for your approval.`, { requestId: req.id });
+      notify({ type: 'proposal', requestId: req.id });
+      changed++;
+    } else if (p && p.status === 'pending' && p.quotesConsidered !== req.quotes.length) {
+      // more quotes arrived while waiting for approval: refresh the recommendation
+      const rec = buildProposal(req, { feePct: p.feePct });
+      if (rec) { Object.assign(p, rec, { updatedAt: new Date().toISOString() }); store.log('proposal', `${req.ref}: recommendation updated with a new quote (${rec.company})`, { requestId: req.id }); notify({ type: 'proposal', requestId: req.id }); changed++; }
+    }
+  }
+  if (changed) store.save();
+}
+async function approveProposal(req, { quoteId, feePct, subject, body }) {
+  const db = store.load();
+  const q = req.quotes.find((x) => x.id === quoteId);
+  if (!q) throw Object.assign(new Error('Quote not found'), { status: 404 });
+  if (!req.client?.email) throw Object.assign(new Error('The client has no email address. Add one on the trip first.'), { status: 400 });
+  const fee = Number(feePct);
+  if (!(fee >= 0 && fee <= 50)) throw Object.assign(new Error('Enter a brokerage fee between 0 and 50%.'), { status: 400 });
+  req.fee = { type: 'percent', value: fee, min: Number(db.business.feeMin) || 0 };
+  const ev = Proposal.evaluate(req, db.business, routing.tripNeeds(req));
+  const row = ev.rows.find((r) => r.id === quoteId);
+  if (!row || row.clientPriceTarget == null) throw Object.assign(new Error('This quote has no usable price.'), { status: 400 });
+  const draft = Proposal.draftEmail(req, row, db.business, { senderName: db.settings.senderName, routeText: legText(req) });
+  const mail = { to: req.client.email, toName: req.client.name, subject: subject || draft.subject, body: body || draft.body };
+  if (live()) await graph.sendMail(mail);
+  req.quotes.forEach((x) => (x.status = x.id === quoteId ? 'selected' : x.status === 'selected' ? 'received' : x.status));
+  req.proposal = { ...(req.proposal || {}), status: 'sent', quoteId, company: q.company, aircraft: q.aircraft, clientPrice: row.clientPriceTarget, currency: ev.target,
+    feePct: fee, subject: mail.subject, body: mail.body, approvedAt: new Date().toISOString(), sentAt: new Date().toISOString(), simulated: !live() };
+  req.status = 'proposal';
+  req.updatedAt = new Date().toISOString();
+  store.log('proposal', `${req.ref}: you approved ${q.company} at ${fee}% fee; offer of ${ev.target} ${Math.round(row.clientPriceTarget).toLocaleString('en-US')} ${live() ? 'emailed' : 'sent (demo)'} to ${req.client.email}`, { requestId: req.id });
+  store.save();
+  notify({ type: 'request', requestId: req.id });
+  return req;
+}
+function proposeNow(req) {
+  if (!req.quoteWindow) openQuoteWindow(req);
+  req.quoteWindow.closesAt = new Date().toISOString();
+  runProposals();
+  return req;
+}
+
 const CHASEABLE = new Set(['rfq_sent', 'quoting']);
 function runFollowUps() {
   const db = store.load();
@@ -208,6 +279,7 @@ async function handleEmail(email) {
       notes: q.notes, snippet: email.body.slice(0, 600), status: 'received',
     });
     if (['new', 'rfq_sent'].includes(req.status)) req.status = 'quoting';
+    openQuoteWindow(req);
     req.updatedAt = new Date().toISOString();
     store.log('quote', `Quote from ${sender?.company || email.fromName} for ${req.ref}${q.price ? `: ${q.currency || ''} ${q.price.toLocaleString()}` : ''}`, { requestId: req.id });
     store.save();
@@ -280,6 +352,7 @@ async function poll() {
     polling = false;
   }
   runFollowUps();
+  runProposals();
   await drainOutbox();
   notify({ type: 'poll', summary });
   return summary;
@@ -314,4 +387,4 @@ function start() {
   setInterval(() => drainOutbox().catch(() => {}), 10000);
 }
 
-module.exports = { start, poll, queueRfqs, autoRoute, runFollowUps, ackText, drainOutbox, injectDemoEmail, routeLabel, live, onEvent: (fn) => (listeners.add(fn), () => listeners.delete(fn)) };
+module.exports = { start, poll, queueRfqs, autoRoute, runFollowUps, ackText, runProposals, approveProposal, proposeNow, buildProposal, drainOutbox, injectDemoEmail, routeLabel, live, onEvent: (fn) => (listeners.add(fn), () => listeners.delete(fn)) };

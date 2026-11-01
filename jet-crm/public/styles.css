@@ -231,3 +231,13 @@ h3 { color: #000; } .muted, .small.muted { color: var(--muted); }
 .inv-title { color: #000; } .inv-small, .inv-table th, .inv-table .sub td { color: #555; }
 .inv-table, .inv-table td, .inv-table .tot td { color: #000; } .inv-table .tot td { border-top-color: #000; }
 a[style*="color"], span[style*="color"], div[style*="color"], small[style*="color"] { color: #000 !important; }
+
+.approve-cta { display: flex; flex-direction: column; gap: 2px; border: 2px solid #000 !important; }
+.offer-line { font-size: 13px; font-weight: 700; margin-top: 6px; }
+.offer-line.pending { display: inline-block; background: #000; color: #fff; padding: 3px 8px; border-radius: 6px; }
+.offer.pending { border: 2px solid #000; }
+.offer-main { display: flex; flex-direction: column; margin-top: 6px; } .offer-main b { font-size: 17px; }
+.offer-price { font-size: 22px; font-weight: 800; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.ap-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); color: #000; margin: 0; }
+.ap-row.dq { opacity: .55; }
+input[type=radio], input[type=checkbox] { accent-color: #000; }
