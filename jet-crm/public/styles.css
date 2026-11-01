@@ -13,6 +13,10 @@ html, body { margin: 0; color: var(--text); font: 500 15px/1.5 var(--font); lett
 html { background: var(--bg); }
 body { background: linear-gradient(180deg, #eef7ef 0%, var(--bg) 45%, var(--bg-2) 100%) fixed; }
 #bg3d { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+#bgfade { position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: linear-gradient(to bottom, rgba(228, 241, 230, 0) 31vh, rgba(228, 241, 230, .9) 45vh, var(--bg) 58vh, var(--bg-2) 100%); }
+@media (min-aspect-ratio: 13/10) { #bgfade { background: linear-gradient(to bottom, rgba(228, 241, 230, 0) 42vh, rgba(228, 241, 230, .9) 58vh, var(--bg) 72vh, var(--bg-2) 100%); } }
+body.solid #bgfade { background: linear-gradient(to bottom, rgba(228, 241, 230, .78) 0, rgba(228, 241, 230, .95) 22vh, var(--bg) 40vh, var(--bg-2) 100%); }
 main { position: relative; z-index: 1; }
 button, input, select, textarea { font-family: inherit; }
 b, h2, h3, .price, .route { font-weight: 700; }
@@ -175,11 +179,12 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--g
 h2 { letter-spacing: -0.02em; }
 h3 { color: #4f6a5a; }
 .tabs a { font-weight: 600; }
-.hero { position: relative; height: clamp(170px, 30vh, 320px); display: flex; align-items: flex-end; padding-bottom: 14px; pointer-events: none; }
+.hero { position: relative; height: clamp(220px, 38vh, 380px); display: flex; align-items: flex-end; padding-bottom: 14px; pointer-events: none; }
 .hero .eyebrow { display: block; font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
 .hero h1 { margin: 2px 0 0; font-size: clamp(26px, 6vw, 38px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
 .hero p { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; }
-@media (min-width: 900px) { .hero { height: 300px; } }
+@media (min-width: 900px) { .hero { height: 44vh; min-height: 300px; } }
+.hero h1, .hero .eyebrow, .hero p { text-shadow: 0 1px 0 rgba(255,255,255,.6), 0 0 18px rgba(228,241,230,.9); }
 .rfq-item small { display: block; color: var(--muted); font-size: 11.5px; font-weight: 500; }
 .mail-head span { margin-right: 6px; }
 .meta .sep { color: var(--line); }

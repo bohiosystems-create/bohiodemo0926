@@ -588,6 +588,7 @@ async function route() {
   const [path] = h.split('?');
   const tab = path.startsWith('/invoices') ? 'invoices' : path.startsWith('/contacts') ? 'contacts' : path.startsWith('/outbox') ? 'outbox' : path.startsWith('/settings') ? 'settings' : 'requests';
   document.querySelectorAll('.tabs a').forEach((a) => a.classList.toggle('on', a.dataset.tab === tab));
+  document.body.classList.toggle('solid', tab !== 'requests' || path.startsWith('/req/'));
   try {
     if (path.startsWith('/req/')) await renderRequest(path.split('/')[2]);
     else if (tab === 'contacts') await renderContacts();
