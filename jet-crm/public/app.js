@@ -336,7 +336,7 @@ function invoiceHtml(inv) {
   const s = inv.seller;
   return `<div class="invoice">
     <div class="inv-head"><div><b class="inv-biz">${esc(s.name)}</b><div class="inv-small">${esc(s.address || '').replace(/\n/g, '<br>')}${s.taxId ? `<br>VAT / Tax no. ${esc(s.taxId)}` : ''}${s.regNo ? `<br>Reg. ${esc(s.regNo)}` : ''}</div></div>
-      <div style="text-align:right"><div class="inv-title">INVOICE</div><div class="inv-small">No. ${esc(inv.number)}<br>Issued ${esc(inv.issueDate)}<br>Due ${esc(inv.dueDate)}</div></div></div>
+      <div style="text-align:right"><div class="inv-title">INVOICE</div><div class="inv-small">No. ${esc(inv.number)}<br>Issued ${esc(inv.issueDate)}<br>Due ${esc(inv.dueDate)}${inv.requestRef ? `<br>Ref ${esc(inv.requestRef)}` : ''}</div></div></div>
     <div class="inv-small" style="margin:14px 0 4px;letter-spacing:.6px">BILL TO</div>
     <div>${[inv.billTo.company, inv.billTo.name, inv.billTo.email].filter(Boolean).map(esc).join('<br>')}</div>
     <table class="inv-table"><thead><tr><th>Description</th><th>${esc(inv.currency)}</th></tr></thead><tbody>
@@ -372,8 +372,56 @@ async function renderInvoices() {
   view.innerHTML = `
     <div class="stats" style="grid-template-columns:1fr 1fr"><div class="stat"><b style="font-size:17px">${total(open)}</b><span>Outstanding${byCur(open) ? `<br>${byCur(open)}` : ''}</span></div><div class="stat"><b style="font-size:17px">${total(feeItems)}</b><span>Brokerage fees invoiced${byCur(feeItems) ? `<br>${byCur(feeItems)}` : ''}</span></div></div>
     <p class="small muted" style="margin-top:-4px">Totals in ${esc(base)} at today's rates. Each invoice keeps its own currency.</p>
-    ${list.map((i) => `<div class="list-item" data-open="${i.id}"><div class="grow"><b>${esc(i.number)}</b> <span class="badge inv-${i.status}">${i.status}</span><div class="small muted">${esc(i.billTo.name || i.billTo.email || '')} · ${esc(i.requestRef)} · due ${esc(i.dueDate)}</div></div><b>${money(i.total, i.currency)}</b></div>`).join('') || '<div class="empty">No invoices yet.<br><span class="small">Open a trip, compare quotes and tap <b>Invoice client</b>.</span></div>'}`;
+    ${list.map((i) => `<div class="list-item" data-open="${i.id}"><div class="grow"><b>${esc(i.number)}</b> <span class="badge inv-${i.status}">${i.status}</span><div class="small muted">${esc(i.billTo.company || i.billTo.name || i.billTo.email || '')}${i.requestRef ? ' · ' + esc(i.requestRef) : ''} · due ${esc(i.dueDate)}</div></div><b>${money(i.total, i.currency)}</b></div>`).join('') || '<div class="empty">No invoices yet.<br><span class="small">Open a trip, compare quotes and tap <b>Invoice client</b>.</span></div>'}`;
   view.querySelectorAll('[data-open]').forEach((el) => (el.onclick = () => invoiceSheet(list.find((i) => i.id === el.dataset.open))));
+  view.insertAdjacentHTML('beforeend', '<button class="fab" id="newInv" aria-label="New invoice"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>');
+  $('#newInv').onclick = newInvoiceSheet;
+}
+
+async function newInvoiceSheet() {
+  const biz = state.business;
+  const [contacts, reqs] = await Promise.all([api('/contacts'), api('/requests')]);
+  const clients = contacts.filter((c) => c.type === 'client');
+  const KINDS = { charter: 'Charter', fee: 'Brokerage fee', other: 'Other' };
+  const lineRow = (l = {}) => `<div class="card inv-line" style="padding:10px" data-line>
+      <div class="grid2"><select data-k="kind">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}" ${k === (l.kind || 'charter') ? 'selected' : ''}>${v}</option>`).join('')}</select><input data-k="amount" type="number" step="0.01" inputmode="decimal" placeholder="Amount" value="${l.amount ?? ''}"></div>
+      <input data-k="description" style="margin-top:8px" placeholder="Description, e.g. Private jet charter LTN → NCE" value="${esc(l.description || '')}">
+      <input data-k="detail" style="margin-top:8px" placeholder="Detail (optional), e.g. Challenger 350 · 6 passengers" value="${esc(l.detail || '')}">
+      <button class="btn sm danger" type="button" data-rm style="margin-top:8px">Remove line</button></div>`;
+  sheet(`<h2>New invoice</h2>
+    <p class="small muted">Issued by <b>${esc(biz.name)}</b>, ${esc((biz.address || '').replace(/\n/g, ', '))}.</p>
+    <label>Bill to (pick a client or type)</label>
+    <select id="ni_pick"><option value="">New / other</option>${clients.map((c) => `<option value="${c.id}">${esc(c.name || c.email)}${c.company ? ' · ' + esc(c.company) : ''}</option>`).join('')}</select>
+    <div class="grid2"><div><label>Name</label><input id="ni_name"></div><div><label>Company</label><input id="ni_company"></div></div>
+    <div class="grid2"><div><label>Email</label><input id="ni_email" type="email"></div><div><label>Phone</label><input id="ni_phone" type="tel"></div></div>
+    <div class="grid2"><div><label>Currency</label><select id="ni_cur">${curOptions(biz.baseCurrency)}</select></div>
+      <div><label>Link to trip (optional)</label><select id="ni_req"><option value="">None</option>${reqs.map((r) => `<option value="${r.id}">${esc(r.ref)} · ${esc(r.client?.name || '')}</option>`).join('')}</select></div></div>
+    <h3>Lines</h3><div id="ni_lines">${lineRow({ kind: 'charter' })}</div>
+    <button class="btn sm" type="button" id="ni_add">+ Add line</button>
+    <label>Note on the invoice (optional)</label><textarea id="ni_notes" style="min-height:60px"></textarea>
+    <div class="card" id="ni_tot" style="margin-top:12px"></div>
+    <button class="btn primary block" id="ni_go">Issue invoice</button>`, (root) => {
+    const readLines = () => [...root.querySelectorAll('[data-line]')].map((el) => Object.fromEntries([...el.querySelectorAll('[data-k]')].map((i) => [i.dataset.k, i.value])));
+    const totals = () => {
+      const cur = $('#ni_cur').value, t = Pricing.manualTotals(readLines(), biz);
+      $('#ni_tot').innerHTML = `<div class="row between"><span>Subtotal</span><b>${money(t.subtotal, cur)}</b></div>
+        ${t.vatRate ? `<div class="row between small muted"><span>VAT ${t.vatRate}%${biz.vatOn === 'fee' ? ' on fee' : ''}</span><span>${money(t.vat, cur)}</span></div>` : ''}
+        <div class="row between" style="font-size:18px;margin-top:6px"><span>Total</span><b>${money(t.total, cur)}</b></div>`;
+    };
+    const wire = () => { root.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { if (root.querySelectorAll('[data-line]').length > 1) b.closest('[data-line]').remove(); totals(); })); root.querySelectorAll('[data-line] input, [data-line] select').forEach((i) => (i.oninput = totals)); };
+    $('#ni_add').onclick = () => { $('#ni_lines').insertAdjacentHTML('beforeend', lineRow({ kind: 'fee' })); wire(); totals(); };
+    $('#ni_cur').onchange = totals;
+    $('#ni_pick').onchange = (e) => { const c = clients.find((x) => x.id === e.target.value) || {}; $('#ni_name').value = c.name || ''; $('#ni_company').value = c.company || ''; $('#ni_email').value = c.email || ''; $('#ni_phone').value = c.phone || ''; if (c.preferredCurrency) { $('#ni_cur').value = c.preferredCurrency; totals(); } };
+    $('#ni_req').onchange = (e) => { const r = reqs.find((x) => x.id === e.target.value); if (!r) return; if (!$('#ni_name').value) { $('#ni_name').value = r.client?.name || ''; $('#ni_email').value = r.client?.email || ''; $('#ni_company').value = r.client?.company || ''; } if (r.currency) { $('#ni_cur').value = r.currency; totals(); } };
+    $('#ni_go').onclick = async () => {
+      try {
+        const inv = await api('/invoices', { method: 'POST', body: { billTo: { name: $('#ni_name').value, company: $('#ni_company').value, email: $('#ni_email').value, phone: $('#ni_phone').value },
+          currency: $('#ni_cur').value, requestId: $('#ni_req').value || null, lines: readLines(), notes: $('#ni_notes').value } });
+        toast(`Invoice ${inv.number} issued`); await renderInvoices(); invoiceSheet(inv);
+      } catch (e) { toast(e.message); }
+    };
+    wire(); totals();
+  });
 }
 
 async function rfqSheet(r) {

@@ -51,8 +51,8 @@ Kind regards,
   },
   discoveries: {},
   business: {
-    name: process.env.BUSINESS_NAME || 'Bohio',
-    address: '', taxId: '', regNo: '', email: '', phone: '', website: '',
+    name: process.env.BUSINESS_NAME || 'Bohio Systems FZCO',
+    address: 'Dubai, United Arab Emirates', taxId: '', regNo: '', email: '', phone: '', website: '',
     bankName: '', accountName: '', iban: '', swift: '',
     baseCurrency: 'EUR', fxRates: {}, fxAuto: true, fxLive: {}, fxOverrides: {}, fxBufferPct: 0, fxSource: null, fxUpdatedAt: null, fxError: null,
     feeType: 'percent', feeValue: 10, feeMin: 0, feeDisplay: 'bundled',
@@ -82,7 +82,8 @@ function load() {
     db.settings.followUp = { ...empty().settings.followUp, ...db.settings.followUp };
     if (db.settings.autoAck === undefined) db.settings.autoAck = true;
     if (!db.settings.ackTemplate) db.settings.ackTemplate = empty().settings.ackTemplate;
-    if (db.business.name === 'Your Brokerage Ltd') db.business.name = 'Bohio';
+    if (['Your Brokerage Ltd', 'Bohio'].includes(db.business.name)) db.business.name = 'Bohio Systems FZCO';
+    if (!db.business.address) db.business.address = 'Dubai, United Arab Emirates';
     if (!Object.keys(db.business.fxOverrides || {}).length && !Object.keys(db.business.fxLive || {}).length && Object.keys(db.business.fxRates || {}).length) {
       db.business.fxOverrides = { ...db.business.fxRates }; // rates typed before live rates existed become manual overrides
     }

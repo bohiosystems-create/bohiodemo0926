@@ -54,6 +54,38 @@ function create(request, quoteId) {
   return inv;
 }
 
+// A free-form invoice written by hand (no trip / quote needed).
+function createManual(body) {
+  const db = store.load();
+  const biz = db.business;
+  const billTo = body.billTo || {};
+  if (!billTo.name && !billTo.company) throw Object.assign(new Error('Add who the invoice is to (name or company).'), { status: 400 });
+  const lines = (body.lines || [])
+    .map((l) => ({ kind: ['charter', 'fee', 'other'].includes(l.kind) ? l.kind : 'other', description: String(l.description || '').trim(), detail: String(l.detail || '').trim(), amount: Pricing.round2(Number(l.amount) || 0) }))
+    .filter((l) => l.description && l.amount);
+  if (!lines.length) throw Object.assign(new Error('Add at least one line with a description and an amount.'), { status: 400 });
+  const currency = String(body.currency || biz.baseCurrency || 'EUR').toUpperCase().slice(0, 3);
+  const t = Pricing.manualTotals(lines, biz);
+  const issue = new Date();
+  const due = new Date(issue.getTime() + (Number(body.paymentTermsDays ?? biz.paymentTermsDays) || 0) * 86400000);
+  const number = `${biz.invoicePrefix || 'INV'}-${issue.getFullYear()}-${String(biz.nextInvoiceNo || 1).padStart(4, '0')}`;
+  const req = body.requestId && db.requests.find((r) => r.id === body.requestId);
+  const inv = {
+    id: store.id('inv'), number, status: 'issued', manual: true, requestId: req?.id || null, requestRef: req?.ref || body.reference || '',
+    issueDate: issue.toISOString().slice(0, 10), dueDate: due.toISOString().slice(0, 10), createdAt: issue.toISOString(),
+    seller: { ...biz }, billTo: { name: billTo.name || '', company: billTo.company || '', email: (billTo.email || '').toLowerCase(), phone: billTo.phone || '' },
+    feeRule: null, operatorPrice: null, currency, lines, ...t, fx: null, notes: String(body.notes || '').trim(),
+  };
+  if (inv.notes) inv.seller.invoiceNotes = [inv.notes, biz.invoiceNotes].filter(Boolean).join('\n');
+  delete inv.seller.nextInvoiceNo;
+  biz.nextInvoiceNo = (Number(biz.nextInvoiceNo) || 1) + 1;
+  db.invoices.unshift(inv);
+  if (req && !req.invoiceId) { req.invoiceId = inv.id; if (['new', 'rfq_sent', 'quoting'].includes(req.status)) req.status = 'proposal'; }
+  store.log('invoice', `Invoice ${number} issued to ${inv.billTo.company || inv.billTo.name}: ${currency} ${inv.total.toLocaleString('en-US')}`, req ? { requestId: req.id } : {});
+  store.save();
+  return inv;
+}
+
 const fmt = (n, c) => `${c} ${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 function pdf(inv) {
@@ -70,7 +102,7 @@ function pdf(inv) {
       .text([s.address, [s.email, s.phone].filter(Boolean).join('  ·  '), s.website, s.taxId && `VAT / Tax no. ${s.taxId}`, s.regNo && `Company reg. ${s.regNo}`].filter(Boolean).join('\n'), { width: W * 0.6 });
     doc.font('Helvetica-Bold').fontSize(22).fillColor(gold).text('INVOICE', 50, 50, { width: W, align: 'right' });
     doc.font('Helvetica').fontSize(10).fillColor(ink)
-      .text(`No. ${inv.number}\nIssued ${inv.issueDate}\nDue ${inv.dueDate}\nTrip ref ${inv.requestRef}`, 50, 80, { width: W, align: 'right' });
+      .text(`No. ${inv.number}\nIssued ${inv.issueDate}\nDue ${inv.dueDate}${inv.requestRef ? `\nRef ${inv.requestRef}` : ''}`, 50, 80, { width: W, align: 'right' });
 
     let y = Math.max(doc.y, 140) + 16;
     doc.moveTo(50, y).lineTo(50 + W, y).strokeColor('#e5e7eb').stroke();
@@ -117,4 +149,4 @@ function pdf(inv) {
   });
 }
 
-module.exports = { create, pdf };
+module.exports = { create, createManual, pdf };

@@ -111,5 +111,15 @@
     return { total: round2(total), missing: [...missing] };
   }
 
-  return { CURRENCIES, rateToBase, crossRate, convert, feeFor, minApplied, effectiveFee, clientCurrency, compareQuotes, invoiceTotals, parseFx, sumIn, round2 };
+  // Totals for a manually written invoice. lines: [{ kind: 'charter'|'fee'|'other', amount }]
+  function manualTotals(lines, business) {
+    const amt = (l) => round2(Number(l.amount) || 0);
+    const subtotal = round2(lines.reduce((n, l) => n + amt(l), 0));
+    const fee = round2(lines.filter((l) => l.kind === 'fee').reduce((n, l) => n + amt(l), 0));
+    const vatRate = Number(business.vatRate) || 0;
+    const vat = round2((business.vatOn === 'fee' ? fee : subtotal) * vatRate / 100);
+    return { subtotal, fee, vatRate, vat, total: round2(subtotal + vat) };
+  }
+
+  return { manualTotals, CURRENCIES, rateToBase, crossRate, convert, feeFor, minApplied, effectiveFee, clientCurrency, compareQuotes, invoiceTotals, parseFx, sumIn, round2 };
 });

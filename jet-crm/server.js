@@ -253,6 +253,10 @@ async function api(req, res, url) {
 
   if (a === 'invoices') {
     if (!b && M === 'GET') return send(res, 200, db.invoices);
+    if (!b && M === 'POST') {
+      try { return send(res, 201, invoices.createManual(await readBody(req))); }
+      catch (e) { return send(res, e.status || 400, { error: e.message }); }
+    }
     const inv = db.invoices.find((x) => x.id === b);
     if (!inv) return send(res, 404, { error: 'Invoice not found' });
     if (!c && M === 'GET') return send(res, 200, inv);
