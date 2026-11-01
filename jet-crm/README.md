@@ -87,5 +87,5 @@ lib/airports.json  Airport codes and coordinates (OpenFlights / OurAirports data
 lib/parser.js      Claude structured extraction with rule-based fallback
 lib/store.js       JSON file storage
 lib/seed.js        Demo suppliers
-public/            Mobile PWA (vanilla JS, no build step); bg3d.js draws the 3D MD-80 background with three.js
+public/            Mobile PWA (vanilla JS, no build step); bg.jpg is the page background photo
 ```

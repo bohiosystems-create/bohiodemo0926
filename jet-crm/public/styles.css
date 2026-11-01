@@ -1,6 +1,6 @@
 :root {
   /* Light green sky, white cards, deep tail-green accent. --gold is the accent token (kept for compatibility). */
-  --bg: #e4f1e6; --bg-2: #d3e8d7; --surface: #ffffff; --surface-2: #f2f6f2; --line: #e1e9e2; --field: #f7faf7;
+  --bg: #f4f6f9; --bg-2: #e7edf3; --surface: #ffffff; --surface-2: #f1f4f7; --line: #dfe6ec; --field: #f6f8fa;
   --text: #14211a; --muted: #6b7a71; --gold: #0d6b3e; --gold-ink: #ffffff;
   --blue: #2c64c7; --green: #128a50; --red: #c8323a; --amber: #a86a12;
   --shadow: 0 1px 2px rgba(20, 50, 30, .05), 0 6px 18px rgba(20, 50, 30, .06);
@@ -11,12 +11,13 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; color: var(--text); font: 500 15px/1.5 var(--font); letter-spacing: -0.005em; -webkit-font-smoothing: antialiased; }
 html { background: var(--bg); }
-body { background: linear-gradient(180deg, #eef7ef 0%, var(--bg) 45%, var(--bg-2) 100%) fixed; }
-#bg3d { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+body { background: var(--bg); }
+#bgimg { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: #b7c8da url('/bg.jpg') no-repeat 30% 0 / cover; }
+@media (min-aspect-ratio: 13/10) { #bgimg { background-position: 30% 38%; } }
 #bgfade { position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background: linear-gradient(to bottom, rgba(228, 241, 230, 0) 31vh, rgba(228, 241, 230, .9) 45vh, var(--bg) 58vh, var(--bg-2) 100%); }
-@media (min-aspect-ratio: 13/10) { #bgfade { background: linear-gradient(to bottom, rgba(228, 241, 230, 0) 42vh, rgba(228, 241, 230, .9) 58vh, var(--bg) 72vh, var(--bg-2) 100%); } }
-body.solid #bgfade { background: linear-gradient(to bottom, rgba(228, 241, 230, .78) 0, rgba(228, 241, 230, .95) 22vh, var(--bg) 40vh, var(--bg-2) 100%); }
+  background: linear-gradient(to bottom, rgba(244, 246, 249, 0) 52vh, rgba(244, 246, 249, .92) 64vh, var(--bg) 76vh, var(--bg-2) 100%); }
+@media (min-aspect-ratio: 13/10) { #bgfade { background: linear-gradient(to bottom, rgba(244, 246, 249, 0) 46vh, rgba(244, 246, 249, .92) 60vh, var(--bg) 74vh, var(--bg-2) 100%); } }
+body.solid #bgfade { background: linear-gradient(to bottom, rgba(244, 246, 249, .8) 0, rgba(244, 246, 249, .96) 24vh, var(--bg) 42vh, var(--bg-2) 100%); }
 main { position: relative; z-index: 1; }
 button, input, select, textarea { font-family: inherit; }
 b, h2, h3, .price, .route { font-weight: 700; }
@@ -159,7 +160,7 @@ button.list-item.ap-opt { width: 100%; background: none; border: 0; border-botto
 .rfq-item .mail, .rfq-item .mail div { display: block; }
 
 /* ---- light theme refinements ---- */
-.card, .stat { box-shadow: var(--shadow); border-color: transparent; }
+.card, .stat { box-shadow: var(--shadow); border-color: var(--line); }
 .card .card { box-shadow: none; border: 1px solid var(--line); }
 .sync { background: rgba(255, 255, 255, .8); }
 .chip { background: rgba(255, 255, 255, .85); border-color: transparent; box-shadow: 0 1px 2px rgba(20, 50, 30, .06); color: var(--muted); font-weight: 600; }
@@ -179,12 +180,12 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--g
 h2 { letter-spacing: -0.02em; }
 h3 { color: #4f6a5a; }
 .tabs a { font-weight: 600; }
-.hero { position: relative; height: clamp(220px, 38vh, 380px); display: flex; align-items: flex-end; padding-bottom: 14px; pointer-events: none; }
+.hero { position: relative; height: clamp(300px, 54vh, 620px); display: flex; align-items: flex-end; padding-bottom: 14px; pointer-events: none; }
 .hero .eyebrow { display: block; font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
 .hero h1 { margin: 2px 0 0; font-size: clamp(26px, 6vw, 38px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
 .hero p { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; }
-@media (min-width: 900px) { .hero { height: 44vh; min-height: 300px; } }
-.hero h1, .hero .eyebrow, .hero p { text-shadow: 0 1px 0 rgba(255,255,255,.6), 0 0 18px rgba(228,241,230,.9); }
+@media (min-width: 900px) { .hero { height: 48vh; min-height: 320px; } }
+.hero h1, .hero .eyebrow, .hero p { text-shadow: 0 1px 0 rgba(255,255,255,.7), 0 0 18px rgba(244,246,249,.95); }
 .rfq-item small { display: block; color: var(--muted); font-size: 11.5px; font-weight: 500; }
 .mail-head span { margin-right: 6px; }
 .meta .sep { color: var(--line); }
