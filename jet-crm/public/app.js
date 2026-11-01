@@ -372,7 +372,7 @@ async function renderInvoices() {
   const byCur = (items) => { const by = {}; items.forEach((x) => (by[x.currency] = (by[x.currency] || 0) + x.amount)); return Object.keys(by).length > 1 ? Object.entries(by).map(([c, n]) => money(n, c)).join(' · ') : ''; };
   const open = list.filter((i) => ['issued', 'sent'].includes(i.status)).map((i) => ({ amount: i.total, currency: i.currency }));
   const feeItems = list.filter((i) => i.status !== 'void').map((i) => ({ amount: i.fee, currency: i.currency }));
-  view.innerHTML = `<h2>Invoices</h2>
+  view.innerHTML = `
     <div class="stats" style="grid-template-columns:1fr 1fr"><div class="stat"><b style="font-size:17px">${total(open)}</b><span>Outstanding${byCur(open) ? `<br>${byCur(open)}` : ''}</span></div><div class="stat"><b style="font-size:17px">${total(feeItems)}</b><span>Brokerage fees invoiced${byCur(feeItems) ? `<br>${byCur(feeItems)}` : ''}</span></div></div>
     <p class="small muted" style="margin-top:-4px">Totals in ${esc(base)} at today's rates. Each invoice keeps its own currency.</p>
     ${list.map((i) => `<div class="list-item" data-open="${i.id}"><div class="grow"><b>${esc(i.number)}</b> <span class="badge inv-${i.status}">${i.status}</span><div class="small muted">${esc(i.billTo.name || i.billTo.email || '')} · ${esc(i.requestRef)} · due ${esc(i.dueDate)}</div></div><b>${money(i.total, i.currency)}</b></div>`).join('') || '<div class="empty">No invoices yet.<br><span class="small">Open a trip, compare quotes and tap <b>Invoice client</b>.</span></div>'}`;
@@ -413,7 +413,7 @@ async function renderContacts() {
     .filter((c) => !contactQ || `${c.name} ${c.company} ${c.email} ${c.region}`.toLowerCase().includes(contactQ.toLowerCase()))
     .sort((a, b) => (a.company || a.name || '').localeCompare(b.company || b.name || ''));
   const noBase = all.filter((c) => c.type === 'operator' && !(c.global) && !c.bases && !c.region).length;
-  view.innerHTML = `<div class="row between"><h2>Contacts</h2><button class="btn sm" id="imp">Import CSV</button></div>
+  view.innerHTML = `<div class="row" style="justify-content:flex-end"><button class="btn sm" id="imp">Import CSV</button></div>
     ${noBase ? `<div class="banner">${noBase} operator${noBase === 1 ? ' has' : 's have'} no base airport, so ${noBase === 1 ? 'it' : 'they'} won't receive routed RFQs. Tap one to add its base (e.g. EGLF).</div>` : ''}
     <input placeholder="Search name, company, region…" id="q" value="${esc(contactQ)}">
     <div class="chips" style="margin-top:10px">${[['supplier', 'Brokers & operators'], ['client', 'Clients'], ['all', 'All']].map(([k, v]) => `<button class="chip ${k === contactType ? 'on' : ''}" data-t="${k}">${v}</button>`).join('')}</div>
@@ -459,7 +459,7 @@ function contactSheet(c = {}) {
 
 async function renderOutbox() {
   const [out, act] = await Promise.all([api('/outbox'), api('/activity')]);
-  view.innerHTML = `<h2>Sent emails</h2>
+  view.innerHTML = `
     ${out.length ? out.slice(0, 60).map((o) => `<div class="list-item"><div class="grow"><b>${esc(o.toName || o.to)}</b> <span class="badge ${o.status}">${o.kind === 'followup' ? `follow-up ${o.followUpNo} · ` : ''}${o.status}</span><div class="small muted">${esc(o.subject)}</div>${o.error ? `<div class="small" style="color:var(--red)">${esc(o.error)}</div>` : ''}</div><span class="small muted">${ago(o.sentAt || o.queuedAt)}</span></div>`).join('') : '<div class="empty">No RFQs sent yet.</div>'}
     <h3>Activity</h3>
     ${act.map((a) => `<div class="list-item small"><div class="grow">${a.requestId ? `<a href="#/req/${a.requestId}">${esc(a.text)}</a>` : esc(a.text)}</div><span class="muted">${ago(a.at)}</span></div>`).join('') || '<p class="muted">Nothing yet.</p>'}`;
@@ -469,7 +469,7 @@ async function renderSettings() {
   await refreshState();
   const s = state.settings, o = state.outlook, b = state.business;
   const params = new URLSearchParams(location.hash.split('?')[1] || '');
-  view.innerHTML = `<h2>Settings</h2>
+  view.innerHTML = `
     ${params.get('error') ? `<div class="banner">${esc(params.get('error'))}</div>` : ''}
     <h3>Outlook mailbox</h3>
     <div class="card">${o.live
