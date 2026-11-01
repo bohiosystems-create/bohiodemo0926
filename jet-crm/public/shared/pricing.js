@@ -1,83 +1,115 @@
 // Shared by server and browser: brokerage fee, currency conversion, quote comparison, invoice totals.
+// Exchange rates: business.fxRates = { USD: 3.75, EUR: 4.05 } = units of base currency per 1 unit of X.
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.Pricing = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
   const round2 = (n) => Math.round(n * 100) / 100;
+  const CURRENCIES = ['USD', 'EUR', 'GBP', 'CHF', 'SAR', 'AED', 'QAR', 'KWD', 'BHD', 'OMR', 'TRY', 'RUB', 'INR', 'CNY', 'HKD', 'SGD', 'JPY', 'AUD', 'CAD', 'BRL', 'MXN', 'ZAR', 'EGP', 'MAD', 'NOK', 'SEK', 'DKK', 'PLN', 'CZK', 'ILS'];
 
-  // Fee for one quote, in the quote's currency. Fixed fees and minimums are entered in the base currency
-  // and converted with fxRates (units of base per 1 unit of currency).
-  function feeFor(operatorPrice, feeRule, currency, base, fxRates) {
+  const baseOf = (business) => (business.baseCurrency || 'EUR').toUpperCase();
+
+  // Units of base per 1 unit of `cur` (1 for the base itself, null if unknown).
+  function rateToBase(cur, business) {
+    const base = baseOf(business);
+    if (!cur || cur === base) return 1;
+    const r = Number(business.fxRates && business.fxRates[cur]);
+    return r > 0 ? r : null;
+  }
+
+  // Cross rate: how many `to` for 1 `from`. null when a rate is missing.
+  function crossRate(from, to, business) {
+    if (!from || !to || from === to) return 1;
+    const a = rateToBase(from, business), b = rateToBase(to, business);
+    return a && b ? a / b : null;
+  }
+
+  // Converts with the optional FX buffer (business.fxBufferPct) applied whenever a conversion happens.
+  function convert(amount, from, to, business, { buffer = true } = {}) {
+    if (amount == null) return null;
+    const r = crossRate(from, to, business);
+    if (r == null) return null;
+    const pct = buffer && from !== to ? Number(business.fxBufferPct) || 0 : 0;
+    return round2(amount * r * (1 + pct / 100));
+  }
+
+  // Fee for one quote, in the quote's currency. Fixed fees and minimums are entered in the base currency.
+  function feeFor(operatorPrice, feeRule, currency, business) {
     const rule = feeRule || { type: 'percent', value: 0 };
-    const rate = !currency || currency === base ? 1 : Number(fxRates && fxRates[currency]) || 1;
-    const fromBase = (v) => (Number(v) || 0) / rate;
+    const fromBase = (v) => convert(Number(v) || 0, baseOf(business), currency || baseOf(business), business, { buffer: false }) ?? (Number(v) || 0);
     let fee = rule.type === 'fixed' ? fromBase(rule.value) : operatorPrice * (Number(rule.value) || 0) / 100;
-    const minApplied = rule.type === 'percent' && rule.min && fromBase(rule.min) > fee;
-    if (minApplied) fee = fromBase(rule.min);
+    if (rule.type === 'percent' && rule.min && fromBase(rule.min) > fee) fee = fromBase(rule.min);
     return round2(fee);
   }
-  const minApplied = (price, rule, currency, base, fx) =>
-    rule.type === 'percent' && rule.min > 0 && feeFor(price, rule, currency, base, fx) > round2(price * rule.value / 100);
-
-  // fxRates: { USD: 3.75, EUR: 4.05 } = how many units of base currency 1 unit is worth. Base itself = 1.
-  function toBase(amount, currency, base, fxRates) {
-    if (amount == null) return null;
-    if (!currency || currency === base) return amount;
-    const r = fxRates && Number(fxRates[currency]);
-    return r ? amount * r : null;
-  }
+  const minApplied = (price, rule, currency, business) =>
+    rule.type === 'percent' && rule.min > 0 && feeFor(price, rule, currency, business) > round2(price * rule.value / 100);
 
   function effectiveFee(request, business) {
     return request.fee || { type: business.feeType || 'percent', value: business.feeValue ?? 10, min: business.feeMin || 0 };
   }
 
-  // Returns quotes with clientPrice/fee/base figures, ranked cheapest-for-client first.
+  // The currency the client is quoted and invoiced in.
+  const clientCurrency = (request, business) => (request.currency || baseOf(business)).toUpperCase();
+
+  // Quotes with fee + client price in the quote's currency and in the client's currency, ranked cheapest first.
   function compareQuotes(request, business) {
     const rule = effectiveFee(request, business);
-    const base = business.baseCurrency || 'EUR';
+    const target = clientCurrency(request, business);
     const rows = request.quotes.map((q) => {
-      const fee = q.price != null ? feeFor(q.price, rule, q.currency || base, base, business.fxRates) : null;
+      const cur = (q.currency || baseOf(business)).toUpperCase();
+      const fee = q.price != null ? feeFor(q.price, rule, cur, business) : null;
       const clientPrice = q.price != null ? round2(q.price + fee) : null;
       const ageYears = q.year ? new Date().getFullYear() - Number(q.year) : null;
-      return { ...q, fee, clientPrice, ageYears, clientPriceBase: toBase(clientPrice, q.currency, base, business.fxRates) };
+      return { ...q, currency: cur, fee, clientPrice, ageYears, clientPriceTarget: convert(clientPrice, cur, target, business), converted: cur !== target };
     });
     const priced = rows.filter((r) => r.clientPrice != null);
-    const currencies = [...new Set(priced.map((r) => r.currency || base))];
-    const comparable = priced.every((r) => r.clientPriceBase != null);
-    const key = (r) => (comparable ? r.clientPriceBase : r.clientPrice);
+    const comparable = priced.every((r) => r.clientPriceTarget != null);
+    const missingRates = [...new Set(priced.filter((r) => r.clientPriceTarget == null).map((r) => r.currency))];
+    const key = (r) => (r.clientPriceTarget ?? Infinity);
     priced.sort((a, b) => key(a) - key(b));
-    const best = priced[0];
+    const best = priced.find((r) => r.clientPriceTarget != null);
     priced.forEach((r) => {
-      r.deltaPct = best && (comparable || r.currency === best.currency) ? round2(((key(r) - key(best)) / key(best)) * 100) : null;
+      r.deltaPct = best && r.clientPriceTarget != null ? round2(((r.clientPriceTarget - best.clientPriceTarget) / best.clientPriceTarget) * 100) : null;
       r.isBest = r === best;
     });
-    return { rows: priced.concat(rows.filter((r) => r.clientPrice == null)), rule, base, comparable, mixedCurrencies: currencies.length > 1, best };
+    return { rows: priced.concat(rows.filter((r) => r.clientPrice == null)), rule, base: baseOf(business), target, comparable, missingRates, best,
+      mixedCurrencies: new Set(priced.map((r) => r.currency)).size > 1 };
   }
 
-  // Builds invoice lines/totals for the selected quote.
-  function invoiceTotals(quote, feeRule, business) {
-    const base = business.baseCurrency || 'EUR';
-    const fee = feeFor(quote.price, feeRule, quote.currency || base, base, business.fxRates);
+  // Invoice lines/totals for the selected quote, in the invoice currency (default: the client's currency).
+  function invoiceTotals(quote, feeRule, business, invoiceCurrency) {
+    const qc = (quote.currency || baseOf(business)).toUpperCase();
+    const ic = (invoiceCurrency || qc).toUpperCase();
+    const feeQ = feeFor(quote.price, feeRule, qc, business);
+    const conv = (v) => convert(v, qc, ic, business);
+    const operatorPrice = conv(quote.price), fee = conv(feeQ);
+    if (operatorPrice == null || fee == null) return { error: `No exchange rate for ${qc} → ${ic}. Add one in Settings → Tax & currency.` };
     const vatRate = Number(business.vatRate) || 0;
     const separate = business.feeDisplay === 'separate';
-    const lines = separate
-      ? [{ kind: 'charter', amount: round2(quote.price) }, { kind: 'fee', amount: fee }]
-      : [{ kind: 'charter', amount: round2(quote.price + fee) }];
-    const subtotal = round2(quote.price + fee);
-    const vatBase = business.vatOn === 'fee' ? fee : subtotal;
-    const vat = round2(vatBase * vatRate / 100);
-    return { lines, fee, operatorPrice: round2(quote.price), subtotal, vatRate, vat, total: round2(subtotal + vat), currency: quote.currency || base,
-      minApplied: minApplied(quote.price, feeRule, quote.currency || base, base, business.fxRates) };
+    const subtotal = round2(operatorPrice + fee);
+    const lines = separate ? [{ kind: 'charter', amount: operatorPrice }, { kind: 'fee', amount: fee }] : [{ kind: 'charter', amount: subtotal }];
+    const vat = round2((business.vatOn === 'fee' ? fee : subtotal) * vatRate / 100);
+    const fx = qc === ic ? null : { from: qc, to: ic, rate: Number(crossRate(qc, ic, business).toPrecision(6)), bufferPct: Number(business.fxBufferPct) || 0,
+      source: business.fxSource || 'manual', at: business.fxUpdatedAt || null, operatorPriceOriginal: round2(quote.price), feeOriginal: feeQ,
+      bufferAmount: round2(subtotal - convert(quote.price + feeQ, qc, ic, business, { buffer: false })) };
+    return { lines, fee, operatorPrice, subtotal, vatRate, vat, total: round2(subtotal + vat), currency: ic, fx, minApplied: minApplied(quote.price, feeRule, qc, business) };
   }
 
   function parseFx(text) {
     const out = {};
     String(text || '').split(/[,\n;]/).forEach((p) => {
       const m = p.match(/([A-Za-z]{3})\s*[=:]\s*([\d.]+)/);
-      if (m) out[m[1].toUpperCase()] = Number(m[2]);
+      if (m && Number(m[2]) > 0) out[m[1].toUpperCase()] = Number(m[2]);
     });
     return out;
   }
 
-  return { feeFor, minApplied, toBase, compareQuotes, invoiceTotals, effectiveFee, parseFx, round2 };
+  // Sum amounts in mixed currencies into one currency; returns { total, missing: [currencies without a rate] }.
+  function sumIn(items, to, business) {
+    let total = 0; const missing = new Set();
+    items.forEach(({ amount, currency }) => { const v = convert(amount, currency, to, business, { buffer: false }); if (v == null) missing.add(currency); else total += v; });
+    return { total: round2(total), missing: [...missing] };
+  }
+
+  return { CURRENCIES, rateToBase, crossRate, convert, feeFor, minApplied, effectiveFee, clientCurrency, compareQuotes, invoiceTotals, parseFx, sumIn, round2 };
 });

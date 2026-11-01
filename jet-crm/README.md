@@ -6,16 +6,18 @@ A mobile CRM (installable PWA for iPhone and Android) that watches your Outlook 
 2. Each new email is classified as a **charter request**, an **operator/broker quote**, or **other**. With `ANTHROPIC_API_KEY` set, Claude does this and extracts the legs, dates, passengers, category, client details and notes. Without it, a rule-based parser is used.
 3. A charter request becomes a **trip request** (`RFQ-1001`, `RFQ-1002`, …), and the client is added to Contacts.
 4. If **Auto-send RFQs** is on, the request is **routed by geography**:
-   - The departure airport is identified (Claude returns ICAO codes; the built-in table of ~7,700 airports resolves codes and city names).
+   - The departure airport is identified (Claude returns ICAO codes; the built-in table of ~7,700 airports resolves codes, airport names and nicknames such as "Biggin Hill", "Le Bourget" or "Dubai World Central").
+   - **Cities with several airports**: if the client only names a city such as London, Paris, New York, Moscow, Dubai, Milan or Istanbul (about 30 cities, plus city codes like LON, PAR, NYC, MOW), the trip shows "airport not specified" with a **Choose airport** list (business-aviation airports first). Until you choose, RFQs say "London area, airport flexible (FAB, LTN, BQH, LCY, NHT, STN, LGW, LHR)" and routing measures distance from the nearest of those airports.
    - **Operators** whose base airport is within the radius (default 800 km) get the RFQ. **Brokers** marked *covers worldwide* get every RFQ.
    - If fewer nearby operators are on file than the minimum (default 3), **Claude searches the web** for charter operators based near that airport, opens their websites, and adds the ones whose quote/sales email is published on their own domain to Contacts (marked *found online*, with the source page). They are emailed straight away, or added switched off for review if you turn that option off. Each airport is searched at most once every 30 days.
    - If the departure airport can't be recognised, the RFQ goes to every active supplier and the trip says so.
    - Each RFQ goes **from your own mailbox** as an individual email, throttled under Exchange's 30 messages/minute limit. The trip shows who got it and why ("based LTN, 72 km away", "covers worldwide").
 5. A reply that keeps `RFQ-xxxx` in the subject is attached to that request as a **quote** (operator, aircraft, year, tail, price, currency). Quotes are ranked by price, and you can select one and apply your margin.
 6. **Quote comparison**: every quote is shown with operator price, your brokerage fee and the resulting client price. Quotes are converted to your base currency (using the exchange rates you set) and ranked cheapest-for-client first, with "+x% vs best" and an age warning for aircraft over 15 years old. You can correct any price or aircraft the email reader missed.
-7. **Brokerage fee**: a default percentage (with optional minimum) or fixed amount, set in Settings. You can override it per trip. Fixed fees and minimums are entered in your base currency and converted to the quote's currency.
-8. **Invoicing**: tap **Invoice client** on the chosen quote. SkyDesk issues a numbered invoice (e.g. `INV-2026-0001`) under your business name, address, tax number and bank details, with the charter and your fee either combined or on separate lines, plus VAT if you set a rate. You can open it as a PDF, **email it to the client from your Outlook** with the PDF attached, mark it paid (the trip moves to Won) or void it. Only one active invoice per trip.
-9. The phone app updates live (server-sent events, plus a 60-second refresh). Tap the status pill at the top to check the inbox right away.
+7. **Multi-currency**: every trip has a **client currency**, taken from the email (e.g. "budget $120k" = USD), the client's saved preference, or your base currency, and changeable on the trip. Operator quotes in any currency are converted into it, ranked, and invoiced in it. Exchange rates are refreshed live every 6 hours (open.er-api.com, falling back to ECB rates via frankfurter.app); you can override any rate by hand and add an **FX buffer %** to cover currency risk. Each invoice stores the rate it used, and the app shows what the operator must be paid in their own currency. Invoice totals are summed in your base currency at today's rates.
+8. **Brokerage fee**: a default percentage (with optional minimum) or fixed amount, set in Settings. You can override it per trip. Fixed fees and minimums are entered in your base currency and converted to the quote's currency.
+9. **Invoicing**: tap **Invoice client** on the chosen quote. SkyDesk issues a numbered invoice (e.g. `INV-2026-0001`) under your business name, address, tax number and bank details, with the charter and your fee either combined or on separate lines, plus VAT if you set a rate. You can open it as a PDF, **email it to the client from your Outlook** with the PDF attached, mark it paid (the trip moves to Won) or void it. Only one active invoice per trip.
+10. The phone app updates live (server-sent events, plus a 60-second refresh). Tap the status pill at the top to check the inbox right away.
 
 Contacts that sent an email can never trigger a new request: an email from an existing broker or operator is only treated as a quote, or ignored.
 
@@ -53,7 +55,7 @@ Data is stored in `DATA_DIR/db.json`, including the Outlook refresh token. Keep 
 ## Invoicing notes
 
 - Invoices are not sent automatically. You choose the quote and tap send, so a client never gets an invoice you haven't checked.
-- Exchange rates are entered by hand in Settings and are not live; update them when you compare quotes in different currencies.
+- Live rates are mid-market reference rates, not your bank's rate. Use the FX buffer % or manual overrides to match what you actually pay when settling operators.
 - In Saudi Arabia, tax invoices must be issued through a ZATCA (Fatoora) compliant e-invoicing system with QR code and XML clearance. SkyDesk's PDF invoices are not ZATCA-integrated. If you are VAT-registered there, use SkyDesk for quoting and pricing, and either connect a compliant e-invoicing provider or issue the final tax invoice from it. The same applies to other countries with mandatory e-invoicing.
 
 ## Install on your phone
@@ -77,7 +79,8 @@ lib/graph.js       Microsoft Graph OAuth + read inbox + sendMail
 lib/invoice.js     Invoice numbering, snapshot of business details, PDF rendering
 public/shared/pricing.js  Fee, currency conversion, quote ranking, invoice totals (shared by server and app)
 lib/routing.js     Geographic RFQ routing + Claude web search for operators near the departure airport
-lib/geo.js         Airport lookup and distances
+lib/geo.js         Airport lookup (codes, names, nicknames, multi-airport cities) and distances
+lib/fx.js          Live exchange rates with manual overrides
 lib/airports.json  Airport codes and coordinates (OpenFlights / OurAirports data, ODbL)
 lib/parser.js      Claude structured extraction with rule-based fallback
 lib/store.js       JSON file storage

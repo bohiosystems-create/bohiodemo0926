@@ -9,22 +9,27 @@ let client = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
 const DISCOVERY_TTL_DAYS = 30;
 
 const isGlobal = (c) => (c.global ?? c.type === 'broker');
-const departure = (req) => {
+// Departure as a set of points: one airport, or every airport of a city the client named without choosing one.
+const departurePlace = (req) => {
   const leg = req.legs?.[0];
   if (!leg) return null;
-  return geo.resolve(leg.fromCode) || geo.resolve(leg.from);
+  return (leg.fromCode && geo.place(leg.fromCode)) || geo.place(leg.from);
 };
+const departure = (req) => departurePlace(req)?.primary || null;
+const areaOf = (p) => (p && !p.airport && p.ambiguous ? { name: p.metro.name, country: p.metro.country, airports: p.metro.airports.map(geo.code) } : null);
 
 // Ranks every supplier contact for a request. Pure: no side effects.
 function candidates(req, { live }) {
   const db = store.load();
   const cfg = db.settings.routing;
-  const dep = departure(req);
+  const depPlace = departurePlace(req);
+  const dep = depPlace?.primary || null;
+  const depPoints = depPlace ? (depPlace.airport ? [depPlace.airport] : depPlace.metro.airports) : [];
   const rows = db.contacts
     .filter((c) => c.type !== 'client' && c.email && c.email !== req.client?.email && !(c.demo && live))
     .map((c) => {
       const bases = geo.contactBases(c);
-      const nearest = dep && bases.length ? bases.map((b) => ({ b, d: geo.distanceKm(dep, b) })).sort((x, y) => x.d - y.d)[0] : null;
+      const nearest = dep && bases.length ? bases.flatMap((b) => depPoints.map((p) => ({ b, d: geo.distanceKm(p, b) }))).sort((x, y) => x.d - y.d)[0] : null;
       let include = false, reason;
       if (c.rfqEnabled === false) reason = 'RFQs switched off';
       else if (cfg.mode === 'all') { include = true; reason = 'sending to all'; }
@@ -37,7 +42,7 @@ function candidates(req, { live }) {
     })
     .sort((a, b) => (b.include - a.include) || ((a.distanceKm ?? 1e9) - (b.distanceKm ?? 1e9)));
   const nearbyOperators = rows.filter((r) => r.include && !r.global && r.distanceKm != null).length;
-  return { dep, rows, nearbyOperators, cfg };
+  return { dep, area: areaOf(depPlace), rows, nearbyOperators, cfg };
 }
 
 // ---------- web discovery ----------
@@ -156,7 +161,7 @@ async function route(req, { live }) {
   }
   const chosen = plan.rows.filter((r) => r.include);
   const summary = {
-    airport: geo.brief(plan.dep), radiusKm: cfg.radiusKm, mode: cfg.mode,
+    airport: geo.brief(plan.dep), area: plan.area, radiusKm: cfg.radiusKm, mode: cfg.mode,
     nearby: plan.nearbyOperators, worldwide: chosen.filter((r) => r.global).length,
     discovered: discovery?.added?.length || 0, discoveryNote: discovery?.skipped || discovery?.error || null,
     reasons: Object.fromEntries(chosen.map((r) => [r.contact.id, r.reason])),

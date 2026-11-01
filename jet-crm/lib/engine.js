@@ -3,6 +3,7 @@ const store = require('./store');
 const graph = require('./graph');
 const { parseEmail } = require('./parser');
 const routing = require('./routing');
+const geo = require('./geo');
 
 const SENDS_PER_MINUTE = Number(process.env.SENDS_PER_MINUTE || 25); // Exchange Online caps at 30/min
 const listeners = new Set();
@@ -46,7 +47,7 @@ function queueRfqs(req, { onlyContactIds = [], reasons = {} } = {}) {
   const t = db.settings.template;
   const recipients = rfqRecipients(req.client.email).filter((c) => onlyContactIds.includes(c.id));
   const already = new Set(db.outbox.filter((o) => o.requestId === req.id).map((o) => o.contactId));
-  const legs = req.legs.map((l, i) => `  ${i + 1}. ${l.from} → ${l.to}  ${l.date || 'date TBC'}${l.time ? ' ' + l.time : ''}`).join('\n');
+  const legs = req.legs.map((l, i) => `  ${i + 1}. ${geo.describe(l.from, l.fromCode)} → ${geo.describe(l.to, l.toCode)}  ${l.date || 'date TBC'}${l.time ? ' ' + l.time : ''}`).join('\n');
   let n = 0;
   for (const c of recipients) {
     if (already.has(c.id)) continue;
@@ -158,6 +159,7 @@ async function handleEmail(email) {
     source: { messageId: email.id, subject: email.subject, receivedAt: email.receivedAt, body: email.body.slice(0, 8000) },
     client: { id: client.id, name: client.name, email: client.email, phone: client.phone, company: client.company },
     legs: parsed.legs || [], pax: parsed.pax, category: parsed.category, notes: parsed.notes,
+    currency: (parsed.currency || client.preferredCurrency || db.business.baseCurrency || 'EUR').toUpperCase(),
     engine: parsed.engine, quotes: [], rfqCount: 0,
   };
   db.requests.unshift(newReq);

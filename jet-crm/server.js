@@ -12,6 +12,7 @@ const invoices = require('./lib/invoice');
 const Pricing = require('./public/shared/pricing');
 const routing = require('./lib/routing');
 const geo = require('./lib/geo');
+const fx = require('./lib/fx');
 
 const PORT = Number(process.env.PORT || 3000);
 const APP_PASSWORD = process.env.APP_PASSWORD || '';
@@ -69,14 +70,16 @@ function parseCsv(text) {
   return data.map((r) => Object.fromEntries(keys.map((k, i) => [k, (r[i] || '').trim()])));
 }
 
-const CONTACT_FIELDS = ['name', 'email', 'phone', 'company', 'type', 'rfqEnabled', 'region', 'fleet', 'notes', 'tags', 'bases', 'global', 'website'];
+const CONTACT_FIELDS = ['name', 'email', 'phone', 'company', 'type', 'rfqEnabled', 'region', 'fleet', 'notes', 'tags', 'bases', 'global', 'website', 'preferredCurrency'];
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
+
+const withLegInfo = (r) => ({ ...r, legInfo: r.legs.map((l) => ({ from: geo.endpoint(l.from, l.fromCode), to: geo.endpoint(l.to, l.toCode) })) });
 
 function routingView(r) {
   const plan = routing.candidates(r, { live: engine.live() });
   const sentTo = new Set(store.load().outbox.filter((o) => o.requestId === r.id).map((o) => o.contactId));
   return {
-    airport: geo.brief(plan.dep), radiusKm: plan.cfg.radiusKm, nearby: plan.nearbyOperators, minOperators: plan.cfg.minOperators, aiEnabled: routing.aiEnabled(),
+    airport: geo.brief(plan.dep), area: plan.area, radiusKm: plan.cfg.radiusKm, nearby: plan.nearbyOperators, minOperators: plan.cfg.minOperators, aiEnabled: routing.aiEnabled(),
     rows: plan.rows.map((x) => ({ id: x.contact.id, name: x.contact.name, company: x.contact.company, type: x.contact.type, include: x.include, reason: x.reason,
       distanceKm: x.distanceKm, global: x.global, foundOnline: x.contact.source === 'web', sent: sentTo.has(x.contact.id) })),
   };
@@ -131,7 +134,7 @@ async function api(req, res, url) {
 
   // requests
   if (a === 'requests') {
-    if (!b && M === 'GET') return send(res, 200, db.requests.map(({ source, ...r }) => r));
+    if (!b && M === 'GET') return send(res, 200, db.requests.map(({ source, ...r }) => withLegInfo(r)));
     if (!b && M === 'POST') {
       const body = await readBody(req);
       const r = {
@@ -147,9 +150,9 @@ async function api(req, res, url) {
     }
     const r = db.requests.find((x) => x.id === b);
     if (!r) return send(res, 404, { error: 'Not found' });
-    if (!c && M === 'GET') return send(res, 200, { ...r, outbox: db.outbox.filter((o) => o.requestId === r.id) });
+    if (!c && M === 'GET') return send(res, 200, { ...withLegInfo(r), outbox: db.outbox.filter((o) => o.requestId === r.id) });
     if (!c && M === 'PATCH') {
-      Object.assign(r, pick(await readBody(req), ['status', 'notes', 'legs', 'pax', 'category', 'client', 'fee']));
+      Object.assign(r, pick(await readBody(req), ['status', 'notes', 'legs', 'pax', 'category', 'client', 'fee', 'currency']));
       r.updatedAt = new Date().toISOString();
       store.save();
       return send(res, 200, r);
@@ -232,13 +235,18 @@ async function api(req, res, url) {
 
   if (a === 'business' && M === 'PUT') {
     const body = await readBody(req);
+    const prevBase = db.business.baseCurrency;
     const fields = ['name', 'address', 'taxId', 'regNo', 'email', 'phone', 'website', 'bankName', 'accountName', 'iban', 'swift',
-      'baseCurrency', 'feeType', 'feeValue', 'feeMin', 'feeDisplay', 'vatRate', 'vatOn', 'invoicePrefix', 'nextInvoiceNo', 'paymentTermsDays', 'invoiceNotes'];
+      'baseCurrency', 'fxBufferPct', 'feeType', 'feeValue', 'feeMin', 'feeDisplay', 'vatRate', 'vatOn', 'invoicePrefix', 'nextInvoiceNo', 'paymentTermsDays', 'invoiceNotes'];
     Object.assign(db.business, pick(body, fields));
-    for (const k of ['feeValue', 'feeMin', 'vatRate', 'nextInvoiceNo', 'paymentTermsDays']) db.business[k] = Number(db.business[k]) || 0;
-    if (body.fxText !== undefined) db.business.fxRates = Pricing.parseFx(body.fxText);
+    for (const k of ['feeValue', 'feeMin', 'vatRate', 'nextInvoiceNo', 'paymentTermsDays', 'fxBufferPct']) db.business[k] = Number(db.business[k]) || 0;
+    if (body.fxAuto !== undefined) db.business.fxAuto = Boolean(body.fxAuto);
+    if (body.fxText !== undefined) db.business.fxOverrides = Pricing.parseFx(body.fxText);
     db.business.baseCurrency = String(db.business.baseCurrency || 'EUR').toUpperCase();
+    if (db.business.baseCurrency !== prevBase) { db.business.fxLive = {}; db.business.fxUpdatedAt = null; } // live table was relative to the old base
+    fx.apply(db.business);
     store.save();
+    if (db.business.baseCurrency !== prevBase || body.fxAuto) await fx.refresh();
     return send(res, 200, publicState());
   }
 
@@ -276,6 +284,8 @@ async function api(req, res, url) {
       return send(res, 200, inv);
     }
   }
+
+  if (a === 'fx' && b === 'refresh' && M === 'POST') { const out = await fx.refresh(); return send(res, out.error ? 502 : 200, { ...out, ...publicState() }); }
 
   if (a === 'outbox' && M === 'GET') return send(res, 200, db.outbox.slice(-300).reverse());
   if (a === 'activity' && M === 'GET') return send(res, 200, db.activity.slice(0, 100));
@@ -354,4 +364,5 @@ seed.ensure();
 server.listen(PORT, () => {
   console.log(`SkyDesk CRM on http://localhost:${PORT}  (Outlook: ${engine.live() ? 'connected' : graph.configured() ? 'not connected' : 'demo mode'}, AI parsing: ${aiEnabled() ? 'Claude' : 'rules'})`);
   engine.start();
+  fx.start();
 });

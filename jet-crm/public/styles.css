@@ -122,3 +122,13 @@ textarea { min-height: 120px; resize: vertical; } label { display: block; font-s
 .route-stats b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; } .route-stats span { font-size: 11px; color: var(--muted); }
 .rfq-list small { display: block; color: var(--muted); font-size: 11.5px; }
 .badge.web { background: rgba(91, 141, 239, .18); color: var(--blue); }
+
+.leg .ep { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.leg .ep .btn { margin-left: auto; } .leg .arrow { color: var(--gold); }
+.code { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tbc { font-size: 12px; color: var(--amber); }
+.fxnote { margin-top: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(91, 141, 239, .1); color: var(--muted); font-size: 12.5px; }
+.fxgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+.fxgrid div { background: var(--bg); border-radius: 8px; padding: 6px 8px; min-width: 0; } .fxgrid span { display: block; font-size: 11px; color: var(--muted); } .fxgrid b { font-size: 12.5px; font-variant-numeric: tabular-nums; }
+button.list-item.ap-opt { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); color: var(--text); font: inherit; cursor: pointer; }
+.kv { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }

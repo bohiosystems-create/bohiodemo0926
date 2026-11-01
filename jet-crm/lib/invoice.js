@@ -3,7 +3,9 @@ const PDFDocument = require('pdfkit');
 const store = require('./store');
 const Pricing = require('../public/shared/pricing');
 
-const routeText = (r) => r.legs.map((l) => `${l.from} - ${l.to}${l.date ? ` (${l.date})` : ''}`).join(', ') || 'Route TBC';
+const geo = require('./geo');
+const pt = (text, code) => { const e = geo.endpoint(text, code); return e.status === 'airport' ? `${e.airport.city || e.airport.name} (${e.airport.iata || e.airport.icao})` : text; };
+const routeText = (r) => r.legs.map((l) => `${pt(l.from, l.fromCode)} - ${pt(l.to, l.toCode)}${l.date ? ` (${l.date})` : ''}`).join(', ') || 'Route TBC';
 
 function lineText(kind, r, q, inv) {
   if (kind === 'fee') {
@@ -26,7 +28,8 @@ function create(request, quoteId) {
   if (q.price == null) throw new Error('This quote has no price. Edit the quote price first.');
   const biz = db.business;
   const feeRule = Pricing.effectiveFee(request, biz);
-  const totals = Pricing.invoiceTotals(q, feeRule, biz);
+  const totals = Pricing.invoiceTotals(q, feeRule, biz, Pricing.clientCurrency(request, biz));
+  if (totals.error) throw Object.assign(new Error(totals.error), { status: 400 });
   const issue = new Date();
   const due = new Date(issue.getTime() + (Number(biz.paymentTermsDays) || 0) * 86400000);
   const number = `${biz.invoicePrefix || 'INV'}-${issue.getFullYear()}-${String(biz.nextInvoiceNo || 1).padStart(4, '0')}`;

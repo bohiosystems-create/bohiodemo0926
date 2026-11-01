@@ -9,7 +9,7 @@ const str = { type: ['string', 'null'] };
 const SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['kind', 'client', 'legs', 'pax', 'category', 'notes', 'quote'],
+  required: ['kind', 'client', 'legs', 'pax', 'category', 'notes', 'currency', 'quote'],
   properties: {
     kind: { type: 'string', enum: ['charter_request', 'quote', 'other'] },
     client: {
@@ -27,8 +27,8 @@ const SCHEMA = {
         properties: {
           from: { type: 'string' },
           to: { type: 'string' },
-          fromCode: { ...str, description: 'ICAO code of the departure airport if you can identify it (e.g. EGLF)' },
-          toCode: { ...str, description: 'ICAO code of the arrival airport if you can identify it' },
+          fromCode: { ...str, description: 'ICAO code, only if one specific airport is named (e.g. EGLF); null for a city with several airports' },
+          toCode: { ...str, description: 'ICAO code, only if one specific airport is named; null for a city with several airports' },
           date: { ...str, description: 'YYYY-MM-DD if known' },
           time: { ...str, description: 'HH:MM local if known' },
         },
@@ -37,6 +37,7 @@ const SCHEMA = {
     pax: { type: ['integer', 'null'] },
     category: { ...str, description: 'Turboprop, Light, Midsize, Super Midsize, Heavy, Ultra Long Range, Airliner' },
     notes: { ...str, description: 'Pets, catering, luggage, flexibility, budget, etc.' },
+    currency: { ...str, description: 'ISO 4217 code of the currency the client wants to be quoted/billed in, if stated or clearly implied by a budget (e.g. "budget $50k" = USD). null if not stated.' },
     quote: {
       type: 'object',
       additionalProperties: false,
@@ -53,7 +54,7 @@ const SYSTEM = `You are the intake assistant for a private jet charter brokerage
 - "charter_request": a client (or client-side contact) asking for a private flight / price / availability.
 - "quote": an operator or broker replying with a price and aircraft offer for a flight.
 - "other": newsletters, empty-leg blasts, invoices, spam, internal chatter, anything else.
-Airports: keep what the email says but prefer "City (IATA)" when you can infer it, and fill fromCode/toCode with ICAO codes. When a city has several airports and the client names none, pick the main business-aviation airport (e.g. London → EGLF Farnborough or EGGW Luton, Paris → LFPB Le Bourget, New York → KTEB Teterboro, Dubai → OMDW Al Maktoum). Resolve relative dates against the email's received date. Use null for anything unknown; never invent prices or passengers.`;
+Airports: keep what the email says in from/to. Set fromCode/toCode to the ICAO code ONLY when the client names or clearly implies one specific airport (e.g. "Luton", "Le Bourget", "Teterboro", "LBG"). When the client only names a city that has several airports (London, Paris, New York, Moscow, Dubai, Milan...), leave the code null and put just the city name in from/to; the broker will confirm the airport. Resolve relative dates against the email's received date. Use null for anything unknown; never invent prices or passengers.`;
 
 async function parseWithClaude(email, today) {
   const res = await client.beta.messages.create({
@@ -138,6 +139,7 @@ function parseHeuristic(email) {
     pax: paxM ? +paxM[1] : null,
     category: cat,
     notes: null,
+    currency: kind === 'charter_request' ? cur : null,
     quote: { operator: email.fromName || null, aircraft: ac && ac.replace(/\s+(YOM|year|yr|reg|tail|price|total)\b.*$/i, '').replace(/[,.\s]+$/, '').trim(), year: (text.match(/\b(?:yom|year)[:\s]*(\d{4})/i) || [])[1] || null, tail: (text.match(/\b([A-Z0-9]{1,2}-[A-Z]{3,5}|N\d{1,5}[A-Z]{0,2})\b/) || [])[1] || null, price, currency: cur, notes: null },
   };
 }

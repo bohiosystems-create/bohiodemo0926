@@ -41,7 +41,7 @@ const empty = () => ({
     name: process.env.BUSINESS_NAME || 'Bohio',
     address: '', taxId: '', regNo: '', email: '', phone: '', website: '',
     bankName: '', accountName: '', iban: '', swift: '',
-    baseCurrency: 'EUR', fxRates: {},
+    baseCurrency: 'EUR', fxRates: {}, fxAuto: true, fxLive: {}, fxOverrides: {}, fxBufferPct: 0, fxSource: null, fxUpdatedAt: null, fxError: null,
     feeType: 'percent', feeValue: 10, feeMin: 0, feeDisplay: 'bundled',
     vatRate: 0, vatOn: 'total',
     invoicePrefix: 'INV', nextInvoiceNo: 1, paymentTermsDays: 3,
@@ -67,6 +67,9 @@ function load() {
     db.business = { ...empty().business, ...db.business };
     db.settings.routing = { ...empty().settings.routing, ...db.settings.routing };
     if (db.business.name === 'Your Brokerage Ltd') db.business.name = 'Bohio';
+    if (!Object.keys(db.business.fxOverrides || {}).length && !Object.keys(db.business.fxLive || {}).length && Object.keys(db.business.fxRates || {}).length) {
+      db.business.fxOverrides = { ...db.business.fxRates }; // rates typed before live rates existed become manual overrides
+    }
   } else {
     db = empty();
     save();
