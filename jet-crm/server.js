@@ -292,7 +292,9 @@ async function api(req, res, url) {
 
   if (a === 'settings' && M === 'PUT') {
     const body = await readBody(req);
-    Object.assign(db.settings, pick(body, ['autoSendRfq', 'senderName']));
+    Object.assign(db.settings, pick(body, ['autoSendRfq', 'senderName', 'autoAck']));
+    if (typeof body.ackTemplate === 'string' && body.ackTemplate.trim()) db.settings.ackTemplate = body.ackTemplate;
+    if (body.followUp) db.settings.followUp = { enabled: Boolean(body.followUp.enabled), everyMinutes: Math.max(5, Number(body.followUp.everyMinutes) || 15), maxPerOperator: Math.max(1, Math.min(10, Number(body.followUp.maxPerOperator) || 3)) };
     if (body.routing) {
       const rt = body.routing;
       db.settings.routing = {

@@ -4,7 +4,8 @@ A mobile CRM (installable PWA for iPhone and Android) that watches your Outlook 
 
 1. **Every 60 seconds** the server checks your Outlook / Microsoft 365 inbox through Microsoft Graph.
 2. Each new email is classified as a **charter request**, an **operator/broker quote**, or **other**. With `ANTHROPIC_API_KEY` set, Claude does this and extracts the legs, dates, passengers, category, client details and notes. Without it, a rule-based parser is used.
-3. A charter request becomes a **trip request** (`RFQ-1001`, `RFQ-1002`, …), and the client is added to Contacts.
+3. **Instant reply**: the moment a charter request is recognised, SkyDesk replies in the client's own email thread confirming you're on it, with their route, date, passengers and reference (editable in Settings → Client replies & operator follow-ups). If the client later replies in that thread, it's kept on the trip as a client message, not mistaken for a quote.
+   A charter request becomes a **trip request** (`RFQ-1001`, `RFQ-1002`, …), and the client is added to Contacts.
 4. If **Auto-send RFQs** is on, the request is **routed by geography**:
    - The departure airport is identified (Claude returns ICAO codes; the built-in table of ~7,700 airports resolves codes, airport names and nicknames such as "Biggin Hill", "Le Bourget" or "Dubai World Central").
    - **Cities with several airports**: if the client only names a city such as London, Paris, New York, Moscow, Dubai, Milan or Istanbul (about 30 cities, plus city codes like LON, PAR, NYC, MOW), the trip shows "airport not specified" with a **Choose airport** list (business-aviation airports first). Until you choose, RFQs say "London area, airport flexible (FAB, LTN, BQH, LCY, NHT, STN, LGW, LHR)" and routing measures distance from the nearest of those airports.
@@ -13,11 +14,12 @@ A mobile CRM (installable PWA for iPhone and Android) that watches your Outlook 
    - If the departure airport can't be recognised, the RFQ goes to every active supplier and the trip says so.
    - Each RFQ goes **from your own mailbox** as an individual email, throttled under Exchange's 30 messages/minute limit. The trip shows who got it and why ("based LTN, 72 km away", "covers worldwide").
 5. A reply that keeps `RFQ-xxxx` in the subject is attached to that request as a **quote** (operator, aircraft, year, tail, price, currency). Quotes are ranked by price, and you can select one and apply your margin.
-6. **Quote comparison**: every quote is shown with operator price, your brokerage fee and the resulting client price. Quotes are converted to the client's currency and ranked cheapest-for-client first, with "+x% vs best" and an age warning for aircraft over 15 years old. You can correct any price or aircraft the email reader missed.
-7. **Multi-currency**: every trip has a **client currency**, taken from the email (e.g. "budget $120k" = USD), the client's saved preference, or your base currency, and changeable on the trip. Operator quotes in any currency are converted into it, ranked, and invoiced in it. Exchange rates are refreshed live every 6 hours (open.er-api.com, falling back to ECB rates via frankfurter.app); you can override any rate by hand and add an **FX buffer %** to cover currency risk. Each invoice stores the rate it used, and the app shows what the operator must be paid in their own currency. Invoice totals are summed in your base currency at today's rates.
-8. **Brokerage fee**: a default percentage (with optional minimum) or fixed amount, set in Settings. You can override it per trip. Fixed fees and minimums are entered in your base currency and converted to the quote's currency.
-9. **Invoicing**: tap **Invoice client** on the chosen quote. SkyDesk issues a numbered invoice (e.g. `INV-2026-0001`) under your business name, address, tax number and bank details, with the charter and your fee either combined or on separate lines, plus VAT if you set a rate. You can open it as a PDF, **email it to the client from your Outlook** with the PDF attached, mark it paid (the trip moves to Won) or void it. Only one active invoice per trip.
-10. The phone app updates live (server-sent events, plus a 60-second refresh). Tap the status pill at the top to check the inbox right away.
+6. **Operator follow-ups**: operators who haven't replied are chased every 15 minutes with a short follow-up (default up to 3 times each). Chasing stops as soon as they reply, when the trip moves to Proposal/Won/Lost, or once the trip date has passed. Tap any operator on the trip to see the RFQ, each follow-up and their reply.
+7. **Quote comparison**: every quote is shown with operator price, your brokerage fee and the resulting client price. Quotes are converted to the client's currency and ranked cheapest-for-client first, with "+x% vs best" and an age warning for aircraft over 15 years old. You can correct any price or aircraft the email reader missed.
+8. **Multi-currency**: every trip has a **client currency**, taken from the email (e.g. "budget $120k" = USD), the client's saved preference, or your base currency, and changeable on the trip. Operator quotes in any currency are converted into it, ranked, and invoiced in it. Exchange rates are refreshed live every 6 hours (open.er-api.com, falling back to ECB rates via frankfurter.app); you can override any rate by hand and add an **FX buffer %** to cover currency risk. Each invoice stores the rate it used, and the app shows what the operator must be paid in their own currency. Invoice totals are summed in your base currency at today's rates.
+9. **Brokerage fee**: a default percentage (with optional minimum) or fixed amount, set in Settings. You can override it per trip. Fixed fees and minimums are entered in your base currency and converted to the quote's currency.
+10. **Invoicing**: tap **Invoice client** on the chosen quote. SkyDesk issues a numbered invoice (e.g. `INV-2026-0001`) under your business name, address, tax number and bank details, with the charter and your fee either combined or on separate lines, plus VAT if you set a rate. You can open it as a PDF, **email it to the client from your Outlook** with the PDF attached, mark it paid (the trip moves to Won) or void it. Only one active invoice per trip.
+11. The phone app updates live (server-sent events, plus a 60-second refresh). Tap the status pill at the top to check the inbox right away.
 
 Contacts that sent an email can never trigger a new request: an email from an existing broker or operator is only treated as a quote, or ignored.
 
@@ -85,5 +87,5 @@ lib/airports.json  Airport codes and coordinates (OpenFlights / OurAirports data
 lib/parser.js      Claude structured extraction with rule-based fallback
 lib/store.js       JSON file storage
 lib/seed.js        Demo suppliers
-public/            Mobile PWA (vanilla JS, no build step)
+public/            Mobile PWA (vanilla JS, no build step); bg3d.js draws the 3D MD-80 background with three.js
 ```

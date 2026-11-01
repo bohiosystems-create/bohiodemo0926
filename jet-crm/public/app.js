@@ -98,6 +98,7 @@ async function renderRequests() {
   const filters = { open: 'Open', all: 'All', ...STATUS };
   const shown = reqFilter === 'all' ? reqs : reqFilter === 'open' ? open : reqs.filter((r) => r.status === reqFilter);
   view.innerHTML = `
+    <div class="hero"><div><span class="eyebrow">${esc(state.business.name || 'Bohio')}</span><h1>Charter desk</h1><p>${open.length} open request${open.length === 1 ? '' : 's'} · inbox checked every minute</p></div></div>
     ${!state.outlook.live ? `<div class="banner">Demo mode: Outlook isn't connected. RFQs are simulated. <a href="#/settings"><u>Connect Outlook</u></a> or use <b>Simulate email</b> in Settings.</div>` : ''}
     <div class="stats">
       <div class="stat"><b>${open.length}</b><span>Open requests</span></div>
@@ -112,7 +113,7 @@ async function renderRequests() {
         <div class="row between"><span class="small muted">${esc(r.ref)} · ${ago(r.createdAt)}</span><span class="badge ${r.status}">${STATUS[r.status]}</span></div>
         <div class="route" style="margin-top:6px">${routeHtml(r)}</div>
         <div class="meta"><span>${fmtDate(r.legs[0]?.date)}</span><span>${r.pax ?? '?'} pax</span>${r.category ? `<span>${esc(r.category)}</span>` : ''}<span>${esc(r.client?.name || r.client?.email || '')}</span></div>
-        <div class="meta"><span>📤 ${r.rfqCount || 0} RFQs</span><span>💬 ${r.quotes.length} quotes</span>${best ? `<span style="color:var(--green)">Best ${money(best.clientPriceTarget, Pricing.clientCurrency(r, state.business))} to client</span>` : ''}${tbc ? '<span class="tbc">airport to confirm</span>' : ''}</div>
+        <div class="meta"><span>${r.rfqCount || 0} RFQ${r.rfqCount === 1 ? '' : 's'} sent</span><span>${r.quotes.length} quote${r.quotes.length === 1 ? '' : 's'}</span>${best ? `<span style="color:var(--green)">Best ${money(best.clientPriceTarget, Pricing.clientCurrency(r, state.business))} to client</span>` : ''}${tbc ? '<span class="tbc">airport to confirm</span>' : ''}</div>
       </a>`;
     }).join('') : `<div class="empty">No requests here yet.<br><span class="small">New charter enquiries arriving in your inbox appear automatically.</span></div>`}
     <button class="fab" id="newReq" aria-label="New request"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>`;
@@ -163,8 +164,11 @@ async function renderRequest(id) {
   const quotes = cmp.rows;
   const rule = cmp.rule;
   const feeLabel = rule.type === 'fixed' ? money(rule.value, biz.baseCurrency) + ' fixed' : `${rule.value}%${rule.min ? ` (min ${money(rule.min, '')})` : ''}`;
-  const sent = r.outbox.filter((o) => ['sent', 'simulated'].includes(o.status)).length;
-  const queued = r.outbox.filter((o) => o.status === 'queued').length;
+  const rfqs = r.outbox.filter((o) => (o.kind || 'rfq') === 'rfq');
+  const chasersOf = (o) => r.outbox.filter((x) => x.kind === 'followup' && x.parentId === o.id);
+  const sent = rfqs.filter((o) => ['sent', 'simulated'].includes(o.status)).length;
+  const queued = rfqs.filter((o) => o.status === 'queued').length;
+  const fu = state.settings.followUp || {};
   const repliedFrom = new Set(r.quotes.map((q) => q.fromEmail));
   view.innerHTML = `
     <a class="back" href="#/">‹ Requests</a>
@@ -214,18 +218,26 @@ async function renderRequest(id) {
       : r.status === 'new' && r.legs.length && state.settings.autoSendRfq ? '<div class="small muted">Finding operators near the departure airport…</div>' : ''}
       <div style="margin-top:12px"><b>${sent}</b> sent${queued ? ` · <b>${queued}</b> queued` : ''} · <b>${repliedFrom.size}</b> replied</div>
       <div class="grid2" style="margin-top:8px"><button class="btn sm" id="disco">Find operators online</button><button class="btn sm primary" id="rfq">Send RFQ</button></div>
-      <div class="rfq-list">${r.outbox.map((o) => { const reply = r.quotes.find((q) => q.fromEmail === o.to); return `<details class="rfq-item">
-        <summary><span class="grow">${esc(o.toName || o.to)}${o.foundOnline ? ' <span class="badge web">online</span>' : ''}${reply ? ' <span style="color:var(--green)">· replied</span>' : ''}<small>${esc(o.reason || '')}</small></span><span class="badge ${o.status}">${o.status}</span><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
+      ${fu.enabled ? `<div class="small muted" style="margin-top:6px">Operators who haven't replied are chased every ${fu.everyMinutes} min, up to ${fu.maxPerOperator} times.</div>` : ''}
+      <div class="rfq-list">${rfqs.map((o) => { const reply = r.quotes.find((q) => q.fromEmail === o.to); const ch = chasersOf(o); return `<details class="rfq-item">
+        <summary><span class="grow">${esc(o.toName || o.to)}${o.foundOnline ? ' <span class="badge web">online</span>' : ''}${reply ? ' <span style="color:var(--green)">· replied</span>' : ch.length ? ` <span class="tbc">· chased ${ch.length}×</span>` : ''}<small>${esc(o.reason || '')}</small></span><span class="badge ${o.status}">${o.status}</span><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
         <div class="mail">
           <div class="mail-head"><span>Sent to</span> ${esc(o.toName || '')} &lt;${esc(o.to)}&gt;${o.sentAt ? ` · ${ago(o.sentAt)}` : ''}</div>
           <div class="mail-head"><span>Subject</span> ${esc(o.subject)}</div>
           <div class="email-src">${esc(o.body)}</div>
+          ${ch.map((x) => `<div class="mail-head" style="margin-top:10px"><span>Follow-up ${x.followUpNo}</span> ${x.status === 'queued' ? 'sending…' : ago(x.sentAt)}</div><div class="email-src">${esc(x.body.split('---- Original request ----')[0].trim())}</div>`).join('')}
           ${reply ? `<div class="mail-head" style="margin-top:10px"><span>Reply</span> ${esc(reply.fromName || reply.company)} · ${ago(reply.receivedAt)}</div><div class="email-src">${esc(reply.snippet)}</div>` : ''}
           ${o.error ? `<div class="small" style="color:var(--red);margin-top:6px">${esc(o.error)}</div>` : ''}
         </div></details>`; }).join('') || '<div class="muted">Not sent yet</div>'}</div>
       ${r.outbox.length ? '<div class="small muted" style="margin-top:6px">Tap a contact to see the email they were sent.</div>' : ''}</div>
 
-    ${r.source?.body ? `<h3>Original email</h3><div class="small muted" style="margin-bottom:6px">${esc(r.source.subject)} · ${ago(r.source.receivedAt)}</div><div class="email-src">${esc(r.source.body)}</div>` : ''}
+    ${r.source?.body ? `<h3>Client emails</h3><div class="card thread">
+      <details class="rfq-item" open><summary><span class="grow"><b>${esc(r.client?.name || 'Client')}</b> · request<small>${esc(r.source.subject)} · ${ago(r.source.receivedAt)}</small></span><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="mail"><div class="email-src">${esc(r.source.body)}</div></div></details>
+      ${r.ack ? `<details class="rfq-item"><summary><span class="grow"><b>Instant reply</b> <span style="color:var(--green)">· ${r.ack.error ? '' : r.ack.simulated ? 'sent (demo)' : 'sent'}</span>${r.ack.error ? ' <span style="color:var(--red)">· failed</span>' : ''}<small>to ${esc(r.ack.to)} · ${ago(r.ack.at)}</small></span><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="mail"><div class="mail-head"><span>Subject</span> ${esc(r.ack.subject)}</div><div class="email-src">${esc(r.ack.body)}</div>${r.ack.error ? `<div class="small" style="color:var(--red);margin-top:6px">${esc(r.ack.error)}</div>` : ''}</div></details>` : ''}
+      ${(r.clientMessages || []).map((m) => `<details class="rfq-item"><summary><span class="grow"><b>${esc(r.client?.name || 'Client')}</b> · reply<small>${esc(m.subject)} · ${ago(m.at)}</small></span><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="mail"><div class="email-src">${esc(m.body)}</div></div></details>`).join('')}
+    </div>` : ''}
     <button class="btn danger block" style="margin-top:24px" id="del">Delete request</button>`;
 
   $('#status').onchange = async (e) => { await api(`/requests/${id}`, { method: 'PATCH', body: { status: e.target.value } }); toast('Status updated'); };
@@ -440,8 +452,8 @@ function contactSheet(c = {}) {
 
 async function renderOutbox() {
   const [out, act] = await Promise.all([api('/outbox'), api('/activity')]);
-  view.innerHTML = `<h2>RFQ log</h2>
-    ${out.length ? out.slice(0, 60).map((o) => `<div class="list-item"><div class="grow"><b>${esc(o.toName || o.to)}</b> <span class="badge ${o.status}">${o.status}</span><div class="small muted">${esc(o.subject)}</div>${o.error ? `<div class="small" style="color:var(--red)">${esc(o.error)}</div>` : ''}</div><span class="small muted">${ago(o.sentAt || o.queuedAt)}</span></div>`).join('') : '<div class="empty">No RFQs sent yet.</div>'}
+  view.innerHTML = `<h2>Sent emails</h2>
+    ${out.length ? out.slice(0, 60).map((o) => `<div class="list-item"><div class="grow"><b>${esc(o.toName || o.to)}</b> <span class="badge ${o.status}">${o.kind === 'followup' ? `follow-up ${o.followUpNo} · ` : ''}${o.status}</span><div class="small muted">${esc(o.subject)}</div>${o.error ? `<div class="small" style="color:var(--red)">${esc(o.error)}</div>` : ''}</div><span class="small muted">${ago(o.sentAt || o.queuedAt)}</span></div>`).join('') : '<div class="empty">No RFQs sent yet.</div>'}
     <h3>Activity</h3>
     ${act.map((a) => `<div class="list-item small"><div class="grow">${a.requestId ? `<a href="#/req/${a.requestId}">${esc(a.text)}</a>` : esc(a.text)}</div><span class="muted">${ago(a.at)}</span></div>`).join('') || '<p class="muted">Nothing yet.</p>'}`;
 }
@@ -501,6 +513,16 @@ async function renderSettings() {
       <button class="btn primary block" style="margin-top:12px" id="bsv">Save business details</button>
     </div>
 
+    <h3>Client replies & operator follow-ups</h3>
+    <div class="card">
+      <div class="row between"><div class="grow"><b>Reply to the client instantly</b><div class="small muted">As soon as a request arrives, reply in the client's email thread to confirm you're on it.</div></div><label class="switch"><input type="checkbox" id="ack_on" ${s.autoAck ? 'checked' : ''}><span></span></label></div>
+      <label>Reply text</label><textarea id="ack_tpl" style="min-height:200px">${esc(s.ackTemplate || '')}</textarea>
+      <div class="small muted">Placeholders: {{clientFirstName}} {{clientName}} {{ref}} {{route}} {{date}} {{pax}} {{senderName}}</div>
+      <div class="row between" style="margin-top:16px"><div class="grow"><b>Chase operators who haven't replied</b><div class="small muted">Sends a short follow-up in the same thread until they reply, the trip moves to Proposal/Won/Lost, or the limit is reached.</div></div><label class="switch"><input type="checkbox" id="fu_on" ${s.followUp?.enabled ? 'checked' : ''}><span></span></label></div>
+      <div class="grid2"><div><label>Every (minutes)</label><input id="fu_every" type="number" min="5" value="${s.followUp?.everyMinutes ?? 15}"></div><div><label>Max per operator</label><input id="fu_max" type="number" min="1" max="10" value="${s.followUp?.maxPerOperator ?? 3}"></div></div>
+      <button class="btn primary block" style="margin-top:12px" id="acksv">Save</button>
+    </div>
+
     <h3>RFQ email template</h3>
     <div class="card"><label style="margin-top:0">Your name / signature</label><input id="sn" value="${esc(s.senderName)}">
       <label>Subject</label><input id="ts" value="${esc(s.template.subject)}"><label>Body</label><textarea id="tb" style="min-height:220px">${esc(s.template.body)}</textarea>
@@ -522,6 +544,10 @@ Alexander Grant
       <div class="small muted" style="margin-top:6px">Demo brokers reply with simulated quotes within about a minute.</div></div>` : ''}
     <p class="small muted" style="text-align:center;margin-top:26px">Tip: on your phone, use "Add to Home Screen" to install SkyDesk as an app.</p>`;
 
+  $('#acksv').onclick = async () => {
+    state = await api('/settings', { method: 'PUT', body: { autoAck: $('#ack_on').checked, ackTemplate: $('#ack_tpl').value, followUp: { enabled: $('#fu_on').checked, everyMinutes: +$('#fu_every').value, maxPerOperator: +$('#fu_max').value } } });
+    toast('Saved');
+  };
   $('#auto').onchange = async (e) => { await api('/settings', { method: 'PUT', body: { autoSendRfq: e.target.checked } }); toast(e.target.checked ? 'Auto-RFQ on' : 'Auto-RFQ off'); };
   $('#rsv').onclick = async () => {
     state = await api('/settings', { method: 'PUT', body: { routing: { mode: $('#r_mode').value, radiusKm: +$('#r_radius').value, minOperators: +$('#r_min').value, webDiscovery: $('#r_web').checked, emailWebContacts: $('#r_auto').checked } } });

@@ -35,6 +35,19 @@ const empty = () => ({
     lastPollStatus: 'never',
     lastPollError: null,
     routing: { mode: 'nearby', radiusKm: 800, minOperators: 3, webDiscovery: true, emailWebContacts: true },
+    autoAck: true,
+    ackTemplate: `Dear {{clientFirstName}},
+
+Thank you for your request. We are on it.
+
+{{route}}
+{{date}} · {{pax}} passengers
+
+We have already contacted our operators and will come back to you with the best available options shortly. Your reference is {{ref}}.
+
+Kind regards,
+{{senderName}}`,
+    followUp: { enabled: true, everyMinutes: 15, maxPerOperator: 3 },
   },
   discoveries: {},
   business: {
@@ -66,6 +79,9 @@ function load() {
     db.settings = { ...empty().settings, ...db.settings };
     db.business = { ...empty().business, ...db.business };
     db.settings.routing = { ...empty().settings.routing, ...db.settings.routing };
+    db.settings.followUp = { ...empty().settings.followUp, ...db.settings.followUp };
+    if (db.settings.autoAck === undefined) db.settings.autoAck = true;
+    if (!db.settings.ackTemplate) db.settings.ackTemplate = empty().settings.ackTemplate;
     if (db.business.name === 'Your Brokerage Ltd') db.business.name = 'Bohio';
     if (!Object.keys(db.business.fxOverrides || {}).length && !Object.keys(db.business.fxLive || {}).length && Object.keys(db.business.fxRates || {}).length) {
       db.business.fxOverrides = { ...db.business.fxRates }; // rates typed before live rates existed become manual overrides

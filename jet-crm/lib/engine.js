@@ -87,6 +87,66 @@ async function autoRoute(req) {
   return n;
 }
 
+// ---------- instant reply to the client ----------
+function ackText(req) {
+  const db = store.load();
+  const pt = (text, code) => { const e = geo.endpoint(text, code); return e.status === 'airport' ? `${e.airport.city || e.airport.name} (${e.airport.iata || e.airport.icao})` : text; };
+  const vars = {
+    clientFirstName: (req.client?.name || '').split(' ')[0] || 'Sir/Madam', clientName: req.client?.name || '', ref: req.ref,
+    route: req.legs.map((l) => `${pt(l.from, l.fromCode)} → ${pt(l.to, l.toCode)}`).join(', ') || 'Your trip',
+    date: req.legs[0]?.date || 'date to be confirmed', pax: req.pax ?? 'TBC', senderName: db.settings.senderName,
+  };
+  return fill(db.settings.ackTemplate, vars);
+}
+async function acknowledge(req, email) {
+  const db = store.load();
+  if (!db.settings.autoAck || !email?.fromEmail) return;
+  const body = ackText(req);
+  req.ack = { at: new Date().toISOString(), to: email.fromEmail, subject: `RE: ${email.subject}`, body, simulated: !live() };
+  try {
+    if (live()) await graph.reply(email.id, body.replace(/\n/g, '<br>'));
+    store.log('ack', `Replied to ${req.client.name || email.fromEmail}: we're on it (${req.ref})${live() ? '' : ' [demo]'}`, { requestId: req.id });
+  } catch (e) {
+    req.ack.error = e.message;
+    store.log('ack', `Couldn't send the instant reply for ${req.ref}: ${e.message}`, { requestId: req.id });
+  }
+  store.save();
+}
+
+// ---------- chase operators who haven't replied ----------
+const CHASEABLE = new Set(['rfq_sent', 'quoting']);
+function runFollowUps() {
+  const db = store.load();
+  const cfg = db.settings.followUp;
+  if (!cfg?.enabled) return 0;
+  const every = Math.max(5, Number(cfg.everyMinutes) || 15) * 60000;
+  const today = new Date().toISOString().slice(0, 10);
+  let queued = 0;
+  for (const req of db.requests) {
+    if (!CHASEABLE.has(req.status)) continue;
+    if (req.legs[0]?.date && req.legs[0].date < today) continue; // trip date passed
+    const replied = new Set(req.quotes.map((q) => q.fromEmail));
+    for (const o of db.outbox.filter((x) => x.requestId === req.id && (x.kind || 'rfq') === 'rfq' && ['sent', 'simulated'].includes(x.status))) {
+      if (replied.has(o.to)) continue;
+      const chasers = db.outbox.filter((x) => x.kind === 'followup' && x.parentId === o.id);
+      if (chasers.length >= (Number(cfg.maxPerOperator) || 3)) continue;
+      if (chasers.some((x) => x.status === 'queued')) continue;
+      const last = Math.max(Date.parse(o.sentAt), ...chasers.map((x) => Date.parse(x.sentAt || x.queuedAt)));
+      if (Date.now() - last < every) continue;
+      const n = chasers.length + 1;
+      const first = (o.toName || '').split(' ')[0] || 'Team';
+      db.outbox.push({
+        id: store.id('out'), kind: 'followup', parentId: o.id, followUpNo: n, requestId: req.id, contactId: o.contactId, to: o.to, toName: o.toName,
+        subject: `RE: ${o.subject}`, status: 'queued', queuedAt: new Date().toISOString(), reason: `follow-up ${n}`,
+        body: `Dear ${first},\n\nFollowing up on ${req.ref} below: ${routeLabel(req)}, ${req.legs[0]?.date || 'date TBC'}, ${req.pax ?? 'TBC'} passengers.\n\nOur client is waiting on options. Could you send aircraft, price and availability? If you can't operate this trip, a quick "no" is appreciated too.\n\nKind regards,\n${db.settings.senderName}\n\n---- Original request ----\n${o.body}`,
+      });
+      queued++;
+    }
+  }
+  if (queued) { store.log('followup', `Queued ${queued} follow-up${queued === 1 ? '' : 's'} to operators who haven't replied`); store.save(); }
+  return queued;
+}
+
 let sending = false;
 async function drainOutbox() {
   if (sending) return;
@@ -100,7 +160,7 @@ async function drainOutbox() {
       if (o.status !== 'queued') continue;
       try {
         if (live()) await graph.sendMail(o);
-        else scheduleDemoQuote(o);
+        else scheduleDemoQuote(o, o.kind === 'followup' ? 0.4 : 0.65);
         o.status = live() ? 'sent' : 'simulated';
         o.sentAt = new Date().toISOString();
         budget--;
@@ -128,6 +188,15 @@ async function handleEmail(email) {
   const req = refMatch && db.requests.find((r) => r.ref.toUpperCase() === refMatch[0].toUpperCase());
   const parsed = await parseEmail(email);
 
+  if (req && email.fromEmail === (req.client?.email || '').toLowerCase()) {
+    req.clientMessages = req.clientMessages || [];
+    req.clientMessages.push({ at: email.receivedAt, subject: email.subject, body: email.body.slice(0, 4000) });
+    req.updatedAt = new Date().toISOString();
+    store.log('client', `${req.client.name || req.client.email} replied about ${req.ref}`, { requestId: req.id });
+    store.save();
+    notify({ type: 'request', requestId: req.id });
+    return 'client';
+  }
   if (req) {
     const sender = db.contacts.find((c) => c.email === email.fromEmail);
     const q = parsed.quote || {};
@@ -165,6 +234,7 @@ async function handleEmail(email) {
   db.requests.unshift(newReq);
   store.log('request', `New request ${newReq.ref} from ${client.name || client.email}: ${routeLabel(newReq)}`, { requestId: newReq.id });
   store.save();
+  await acknowledge(newReq, email);
   if (db.settings.autoSendRfq && newReq.legs.length) {
     autoRoute(newReq).catch((e) => { console.error('[route]', e); store.log('routing', `Routing failed for ${newReq.ref}: ${e.message}`, { requestId: newReq.id }); store.save(); });
   }
@@ -208,6 +278,7 @@ async function poll() {
     store.save();
     polling = false;
   }
+  runFollowUps();
   await drainOutbox();
   notify({ type: 'poll', summary });
   return summary;
@@ -222,8 +293,8 @@ function injectDemoEmail(email) {
   demoInbox.push({ id: store.id('demo'), receivedAt: new Date().toISOString(), ...email, fromEmail: email.fromEmail.toLowerCase() });
 }
 const AIRCRAFT = [['Citation XLS+', 'Midsize', 'OE-GXL'], ['Challenger 350', 'Super Midsize', '9H-CLA'], ['Global 6000', 'Heavy', 'G-GLBL'], ['Phenom 300E', 'Light', 'CS-PHC'], ['Falcon 7X', 'Heavy', 'HB-JFX']];
-function scheduleDemoQuote(o) {
-  if (Math.random() < 0.35) return; // not everyone replies
+function scheduleDemoQuote(o, chance = 0.65) {
+  if (Math.random() > chance) return; // not everyone replies
   const [ac, , tail] = AIRCRAFT[Math.floor(Math.random() * AIRCRAFT.length)];
   const price = Math.round((18000 + Math.random() * 90000) / 500) * 500;
   setTimeout(() => injectDemoEmail({
@@ -242,4 +313,4 @@ function start() {
   setInterval(() => drainOutbox().catch(() => {}), 10000);
 }
 
-module.exports = { start, poll, queueRfqs, autoRoute, drainOutbox, injectDemoEmail, routeLabel, live, onEvent: (fn) => (listeners.add(fn), () => listeners.delete(fn)) };
+module.exports = { start, poll, queueRfqs, autoRoute, runFollowUps, ackText, drainOutbox, injectDemoEmail, routeLabel, live, onEvent: (fn) => (listeners.add(fn), () => listeners.delete(fn)) };

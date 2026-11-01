@@ -122,6 +122,11 @@ async function sendMail({ to, toName, subject, body, attachments = [] }) {
   });
 }
 
+// Replies in the client's own thread (their original message is quoted below).
+async function reply(messageId, comment) {
+  await graph('POST', `/me/messages/${encodeURIComponent(messageId)}/reply`, { comment });
+}
+
 function account() {
   return store.load().auth?.account || null;
 }
@@ -131,4 +136,4 @@ function disconnect() {
   store.save();
 }
 
-module.exports = { configured, authUrl, exchangeCode, fetchNewMessages, sendMail, account, disconnect };
+module.exports = { configured, authUrl, exchangeCode, fetchNewMessages, sendMail, reply, account, disconnect };
