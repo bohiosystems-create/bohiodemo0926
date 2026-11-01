@@ -214,7 +214,16 @@ async function renderRequest(id) {
       : r.status === 'new' && r.legs.length && state.settings.autoSendRfq ? '<div class="small muted">Finding operators near the departure airport…</div>' : ''}
       <div style="margin-top:12px"><b>${sent}</b> sent${queued ? ` · <b>${queued}</b> queued` : ''} · <b>${repliedFrom.size}</b> replied</div>
       <div class="grid2" style="margin-top:8px"><button class="btn sm" id="disco">Find operators online</button><button class="btn sm primary" id="rfq">Send RFQ</button></div>
-      <div class="rfq-list">${r.outbox.map((o) => `<div><span class="grow">${esc(o.toName || o.to)}${o.foundOnline ? ' <span class="badge web">online</span>' : ''}${repliedFrom.has(o.to) ? ' <span style="color:var(--green)">· replied</span>' : ''}<small>${esc(o.reason || '')}</small></span><span class="badge ${o.status}">${o.status}</span></div>`).join('') || '<div class="muted">Not sent yet</div>'}</div></div>
+      <div class="rfq-list">${r.outbox.map((o) => { const reply = r.quotes.find((q) => q.fromEmail === o.to); return `<details class="rfq-item">
+        <summary><span class="grow">${esc(o.toName || o.to)}${o.foundOnline ? ' <span class="badge web">online</span>' : ''}${reply ? ' <span style="color:var(--green)">· replied</span>' : ''}<small>${esc(o.reason || '')}</small></span><span class="badge ${o.status}">${o.status}</span><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="mail">
+          <div class="mail-head"><span>Sent to</span> ${esc(o.toName || '')} &lt;${esc(o.to)}&gt;${o.sentAt ? ` · ${ago(o.sentAt)}` : ''}</div>
+          <div class="mail-head"><span>Subject</span> ${esc(o.subject)}</div>
+          <div class="email-src">${esc(o.body)}</div>
+          ${reply ? `<div class="mail-head" style="margin-top:10px"><span>Reply</span> ${esc(reply.fromName || reply.company)} · ${ago(reply.receivedAt)}</div><div class="email-src">${esc(reply.snippet)}</div>` : ''}
+          ${o.error ? `<div class="small" style="color:var(--red);margin-top:6px">${esc(o.error)}</div>` : ''}
+        </div></details>`; }).join('') || '<div class="muted">Not sent yet</div>'}</div>
+      ${r.outbox.length ? '<div class="small muted" style="margin-top:6px">Tap a contact to see the email they were sent.</div>' : ''}</div>
 
     ${r.source?.body ? `<h3>Original email</h3><div class="small muted" style="margin-bottom:6px">${esc(r.source.subject)} · ${ago(r.source.receivedAt)}</div><div class="email-src">${esc(r.source.body)}</div>` : ''}
     <button class="btn danger block" style="margin-top:24px" id="del">Delete request</button>`;
