@@ -96,7 +96,7 @@ async function renderRequests() {
   const reqs = await api('/requests');
   const open = reqs.filter((r) => !['won', 'lost'].includes(r.status));
   const filters = { open: 'Open', all: 'All', ...STATUS };
-  const shown = reqFilter === 'all' ? reqs : reqFilter === 'open' ? open : reqs.filter((r) => r.status === reqFilter);
+  const shown = [...open, ...reqs.filter((r) => !open.includes(r))]; // open trips first, then won/lost
   view.innerHTML = `
     <div class="hero" aria-hidden="true"></div>
     ${!state.outlook.live ? `<div class="banner">Demo mode: Outlook isn't connected. RFQs are simulated. <a href="#/settings"><u>Connect Outlook</u></a> or use <b>Simulate email</b> in Settings.</div>` : ''}
@@ -105,7 +105,6 @@ async function renderRequests() {
       <div class="stat"><b>${reqs.reduce((n, r) => n + r.quotes.length, 0)}</b><span>Quotes in</span></div>
       <div class="stat"><b>${reqs.filter((r) => r.status === 'won').length}</b><span>Won</span></div>
     </div>
-    <div class="chips">${Object.entries(filters).map(([k, v]) => `<button class="chip ${k === reqFilter ? 'on' : ''}" data-f="${k}">${v}</button>`).join('')}</div>
     ${shown.length ? shown.map((r) => {
       const best = Pricing.compareQuotes(r, state.business).best;
       const tbc = (r.legInfo || []).some((x) => x.from.status !== 'airport' || x.to.status !== 'airport');
@@ -117,7 +116,6 @@ async function renderRequests() {
       </a>`;
     }).join('') : `<div class="empty">No requests here yet.<br><span class="small">New charter enquiries arriving in your inbox appear automatically.</span></div>`}
     <button class="fab" id="newReq" aria-label="New request"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>`;
-  view.querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => { reqFilter = b.dataset.f; renderRequests(); }));
   $('#newReq').onclick = newRequestSheet;
 }
 
