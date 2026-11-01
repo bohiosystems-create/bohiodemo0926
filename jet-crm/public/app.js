@@ -99,7 +99,6 @@ async function renderRequests() {
   const shown = [...open, ...reqs.filter((r) => !open.includes(r))]; // open trips first, then won/lost
   view.innerHTML = `
     <div class="hero" aria-hidden="true"></div>
-    ${!state.outlook.live ? `<div class="banner">Demo mode: Outlook isn't connected. RFQs are simulated. <a href="#/settings"><u>Connect Outlook</u></a> or use <b>Simulate email</b> in Settings.</div>` : ''}
     <div class="stats">
       <div class="stat"><b>${open.length}</b><span>Open requests</span></div>
       <div class="stat"><b>${reqs.reduce((n, r) => n + r.quotes.length, 0)}</b><span>Quotes in</span></div>
