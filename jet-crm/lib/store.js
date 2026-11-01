@@ -35,6 +35,17 @@ const empty = () => ({
     lastPollStatus: 'never',
     lastPollError: null,
   },
+  business: {
+    name: process.env.BUSINESS_NAME || 'Your Brokerage Ltd',
+    address: '', taxId: '', regNo: '', email: '', phone: '', website: '',
+    bankName: '', accountName: '', iban: '', swift: '',
+    baseCurrency: 'EUR', fxRates: {},
+    feeType: 'percent', feeValue: 10, feeMin: 0, feeDisplay: 'bundled',
+    vatRate: 0, vatOn: 'total',
+    invoicePrefix: 'INV', nextInvoiceNo: 1, paymentTermsDays: 3,
+    invoiceNotes: 'Payment is due in full before departure. Flights are subject to the operator\'s terms and conditions.',
+  },
+  invoices: [],
   auth: null,            // Microsoft OAuth tokens
   processedMessageIds: [],
   contacts: [],          // brokers / operators / clients
@@ -51,6 +62,7 @@ function load() {
   if (fs.existsSync(FILE)) {
     db = { ...empty(), ...JSON.parse(fs.readFileSync(FILE, 'utf8')) };
     db.settings = { ...empty().settings, ...db.settings };
+    db.business = { ...empty().business, ...db.business };
   } else {
     db = empty();
     save();

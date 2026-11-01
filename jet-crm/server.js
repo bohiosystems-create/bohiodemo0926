@@ -8,6 +8,8 @@ const graph = require('./lib/graph');
 const engine = require('./lib/engine');
 const { aiEnabled } = require('./lib/parser');
 const seed = require('./lib/seed');
+const invoices = require('./lib/invoice');
+const Pricing = require('./public/shared/pricing');
 
 const PORT = Number(process.env.PORT || 3000);
 const APP_PASSWORD = process.env.APP_PASSWORD || '';
@@ -72,6 +74,7 @@ function publicState() {
   const db = store.load();
   const { template, ...settings } = db.settings;
   return {
+    business: db.business,
     settings: { ...settings, template },
     outlook: { configured: graph.configured(), account: graph.account(), live: engine.live() },
     aiEnabled: aiEnabled(),
@@ -134,7 +137,7 @@ async function api(req, res, url) {
     if (!r) return send(res, 404, { error: 'Not found' });
     if (!c && M === 'GET') return send(res, 200, { ...r, outbox: db.outbox.filter((o) => o.requestId === r.id) });
     if (!c && M === 'PATCH') {
-      Object.assign(r, pick(await readBody(req), ['status', 'notes', 'legs', 'pax', 'category', 'client', 'margin']));
+      Object.assign(r, pick(await readBody(req), ['status', 'notes', 'legs', 'pax', 'category', 'client', 'fee']));
       r.updatedAt = new Date().toISOString();
       store.save();
       return send(res, 200, r);
@@ -145,6 +148,11 @@ async function api(req, res, url) {
       const n = engine.queueRfqs(r, { onlyContactIds: body.contactIds });
       engine.drainOutbox();
       return send(res, 200, { queued: n });
+    }
+    if (c === 'invoice' && M === 'POST') {
+      const { quoteId } = await readBody(req);
+      try { return send(res, 201, invoices.create(r, quoteId)); }
+      catch (e) { return send(res, e.status || 400, { error: e.message }); }
     }
     if (c === 'quotes' && d && M === 'PATCH') {
       const q = r.quotes.find((x) => x.id === d);
@@ -198,6 +206,53 @@ async function api(req, res, url) {
     if (M === 'DELETE') { db.contacts = db.contacts.filter((x) => x !== con); store.save(); return send(res, 200, { ok: true }); }
   }
 
+  if (a === 'business' && M === 'PUT') {
+    const body = await readBody(req);
+    const fields = ['name', 'address', 'taxId', 'regNo', 'email', 'phone', 'website', 'bankName', 'accountName', 'iban', 'swift',
+      'baseCurrency', 'feeType', 'feeValue', 'feeMin', 'feeDisplay', 'vatRate', 'vatOn', 'invoicePrefix', 'nextInvoiceNo', 'paymentTermsDays', 'invoiceNotes'];
+    Object.assign(db.business, pick(body, fields));
+    for (const k of ['feeValue', 'feeMin', 'vatRate', 'nextInvoiceNo', 'paymentTermsDays']) db.business[k] = Number(db.business[k]) || 0;
+    if (body.fxText !== undefined) db.business.fxRates = Pricing.parseFx(body.fxText);
+    db.business.baseCurrency = String(db.business.baseCurrency || 'EUR').toUpperCase();
+    store.save();
+    return send(res, 200, publicState());
+  }
+
+  if (a === 'invoices') {
+    if (!b && M === 'GET') return send(res, 200, db.invoices);
+    const inv = db.invoices.find((x) => x.id === b);
+    if (!inv) return send(res, 404, { error: 'Invoice not found' });
+    if (!c && M === 'GET') return send(res, 200, inv);
+    if (!c && M === 'PATCH') {
+      const { status } = await readBody(req);
+      if (!['issued', 'sent', 'paid', 'void'].includes(status)) return send(res, 400, { error: 'Unknown status' });
+      inv.status = status;
+      if (status === 'paid') {
+        inv.paidAt = new Date().toISOString();
+        const r = db.requests.find((x) => x.id === inv.requestId);
+        if (r) r.status = 'won';
+      }
+      store.log('invoice', `Invoice ${inv.number} marked ${status}`, { requestId: inv.requestId });
+      store.save();
+      return send(res, 200, inv);
+    }
+    if (c === 'send' && M === 'POST') {
+      if (!inv.billTo.email) return send(res, 400, { error: 'The client has no email address. Add one on the request first.' });
+      const body = `Dear ${inv.billTo.name?.split(' ')[0] || 'Sir/Madam'},\n\nPlease find attached invoice ${inv.number} for your private charter (ref ${inv.requestRef}).\n\nTotal due: ${inv.currency} ${inv.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}\nDue date: ${inv.dueDate}\n\nKind regards,\n${db.settings.senderName}\n${inv.seller.name}`;
+      if (engine.live()) {
+        const buf = await invoices.pdf(inv);
+        await graph.sendMail({ to: inv.billTo.email, toName: inv.billTo.name, subject: `Invoice ${inv.number} | ${inv.seller.name}`, body,
+          attachments: [{ name: `${inv.number}.pdf`, contentType: 'application/pdf', base64: buf.toString('base64') }] });
+      }
+      inv.status = inv.status === 'paid' ? 'paid' : 'sent';
+      inv.sentAt = new Date().toISOString();
+      inv.sentSimulated = !engine.live();
+      store.log('invoice', `Invoice ${inv.number} ${engine.live() ? 'emailed' : 'sent (simulated)'} to ${inv.billTo.email}`, { requestId: inv.requestId });
+      store.save();
+      return send(res, 200, inv);
+    }
+  }
+
   if (a === 'outbox' && M === 'GET') return send(res, 200, db.outbox.slice(-300).reverse());
   if (a === 'activity' && M === 'GET') return send(res, 200, db.activity.slice(0, 100));
 
@@ -226,6 +281,15 @@ const server = http.createServer(async (req, res) => {
   try {
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
 
+    const pdfMatch = url.pathname.match(/^\/invoices\/(inv_[a-f0-9]+)\.pdf$/);
+    if (pdfMatch) {
+      if (!authed(req)) return send(res, 401, { error: 'auth' });
+      const inv = store.load().invoices.find((x) => x.id === pdfMatch[1]);
+      if (!inv) return send(res, 404, { error: 'Invoice not found' });
+      const buf = await invoices.pdf(inv);
+      res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${inv.number}.pdf"`, 'Cache-Control': 'no-store' });
+      return res.end(buf);
+    }
     if (url.pathname === '/auth/login') {
       if (!authed(req)) return res.writeHead(302, { Location: '/' }).end();
       if (!graph.configured()) return send(res, 400, { error: 'Set MS_CLIENT_ID and MS_CLIENT_SECRET first' });

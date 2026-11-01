@@ -136,7 +136,7 @@ function parseHeuristic(email) {
     pax: paxM ? +paxM[1] : null,
     category: cat,
     notes: null,
-    quote: { operator: email.fromName || null, aircraft: ac && ac.trim(), year: (text.match(/\b(?:yom|year)[:\s]*(\d{4})/i) || [])[1] || null, tail: (text.match(/\b([A-Z0-9]{1,2}-[A-Z]{3,5}|N\d{1,5}[A-Z]{0,2})\b/) || [])[1] || null, price, currency: cur, notes: null },
+    quote: { operator: email.fromName || null, aircraft: ac && ac.replace(/\s+(YOM|year|yr|reg|tail|price|total)\b.*$/i, '').replace(/[,.\s]+$/, '').trim(), year: (text.match(/\b(?:yom|year)[:\s]*(\d{4})/i) || [])[1] || null, tail: (text.match(/\b([A-Z0-9]{1,2}-[A-Z]{3,5}|N\d{1,5}[A-Z]{0,2})\b/) || [])[1] || null, price, currency: cur, notes: null },
   };
 }
 

@@ -38,7 +38,8 @@ function routeHtml(r) {
   return pts.map((p) => `<span>${esc(p)}</span>`).join('<span class="arrow">→</span>');
 }
 function sheet(html, onMount) {
-  const s = $('#sheet'); $('#sheetCard').innerHTML = html; s.hidden = false;
+  const s = $('#sheet'); $('#sheetCard').innerHTML = `<button class="sheet-close" aria-label="Close" type="button">×</button>${html}`; s.hidden = false;
+  $('.sheet-close', s).onclick = closeSheet;
   s.onclick = (e) => { if (e.target === s) closeSheet(); };
   onMount && onMount($('#sheetCard'));
 }
@@ -95,12 +96,12 @@ async function renderRequests() {
     </div>
     <div class="chips">${Object.entries(filters).map(([k, v]) => `<button class="chip ${k === reqFilter ? 'on' : ''}" data-f="${k}">${v}</button>`).join('')}</div>
     ${shown.length ? shown.map((r) => {
-      const best = r.quotes.filter((q) => q.price).sort((a, b) => a.price - b.price)[0];
+      const best = Pricing.compareQuotes(r, state.business).best;
       return `<a class="card" href="#/req/${r.id}">
         <div class="row between"><span class="small muted">${esc(r.ref)} · ${ago(r.createdAt)}</span><span class="badge ${r.status}">${STATUS[r.status]}</span></div>
         <div class="route" style="margin-top:6px">${routeHtml(r)}</div>
         <div class="meta"><span>${fmtDate(r.legs[0]?.date)}</span><span>${r.pax ?? '?'} pax</span>${r.category ? `<span>${esc(r.category)}</span>` : ''}<span>${esc(r.client?.name || r.client?.email || '')}</span></div>
-        <div class="meta"><span>📤 ${r.rfqCount || 0} RFQs</span><span>💬 ${r.quotes.length} quotes</span>${best ? `<span style="color:var(--green)">Best ${money(best.price, best.currency)}</span>` : ''}</div>
+        <div class="meta"><span>📤 ${r.rfqCount || 0} RFQs</span><span>💬 ${r.quotes.length} quotes</span>${best ? `<span style="color:var(--green)">Best ${money(best.clientPrice, best.currency)} to client</span>` : ''}</div>
       </a>`;
     }).join('') : `<div class="empty">No requests here yet.<br><span class="small">New charter enquiries arriving in your inbox appear automatically.</span></div>`}
     <button class="fab" id="newReq" aria-label="New request"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>`;
@@ -142,8 +143,11 @@ function newRequestSheet() {
 
 async function renderRequest(id) {
   const r = await api(`/requests/${id}`);
-  const quotes = [...r.quotes].sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
-  const bestId = quotes.find((q) => q.price)?.id;
+  const biz = state.business;
+  const cmp = Pricing.compareQuotes(r, biz);
+  const quotes = cmp.rows;
+  const rule = cmp.rule;
+  const feeLabel = rule.type === 'fixed' ? money(rule.value, biz.baseCurrency) + ' fixed' : `${rule.value}%${rule.min ? ` (min ${money(rule.min, '')})` : ''}`;
   const sent = r.outbox.filter((o) => ['sent', 'simulated'].includes(o.status)).length;
   const queued = r.outbox.filter((o) => o.status === 'queued').length;
   const repliedFrom = new Set(r.quotes.map((q) => q.fromEmail));
@@ -161,15 +165,23 @@ async function renderRequest(id) {
     <div class="card row"><div class="avatar">${initials(r.client?.name)}</div><div class="grow"><b>${esc(r.client?.name || 'Unknown')}</b><div class="small muted">${esc(r.client?.company || '')} ${esc(r.client?.email || '')}</div></div>
       ${r.client?.phone ? `<a class="btn sm" href="tel:${esc(r.client.phone)}">Call</a>` : ''}${r.client?.email ? `<a class="btn sm" href="mailto:${esc(r.client.email)}?subject=${encodeURIComponent('Your charter: ' + r.legs.map((l) => l.from + '-' + l.to).join(', '))}">Email</a>` : ''}</div>
 
-    <h3>Quotes (${quotes.length})</h3>
-    ${quotes.length ? quotes.map((q) => `<div class="card quote">
+    <div class="row between"><h3>Quote comparison (${quotes.length})</h3><button class="chip" id="fee">Fee ${esc(feeLabel)}${r.fee ? '' : ' · default'}</button></div>
+    ${cmp.mixedCurrencies && !cmp.comparable ? `<div class="banner">Quotes are in different currencies. Add exchange rates to ${esc(biz.baseCurrency)} in Settings to rank them together.</div>` : ''}
+    ${quotes.length ? quotes.map((q) => `<div class="card quote ${q.isBest ? 'is-best' : ''}">
       <div class="avatar">${initials(q.company)}</div>
-      <div class="grow"><div class="row between"><b>${esc(q.company || q.fromName)}</b>${q.status === 'selected' ? '<span class="badge selected">Selected</span>' : q.id === bestId ? '<span class="best">BEST PRICE</span>' : ''}</div>
-        <div class="small muted">${esc([q.aircraft, q.year, q.tail].filter(Boolean).join(' · ') || 'Aircraft not stated')}</div>
-        <div class="row between" style="margin-top:6px"><span class="price">${money(q.price, q.currency)}</span>
-          <span class="row"><button class="btn sm" data-view="${q.id}">View</button>${q.status !== 'selected' ? `<button class="btn sm primary" data-pick="${q.id}">Select</button>` : ''}</span></div>
-        ${q.status === 'selected' && q.price ? `<div class="small" style="margin-top:6px">Client price at ${r.margin ?? 10}% margin: <b>${money(q.price * (1 + (r.margin ?? 10) / 100), q.currency)}</b> <button class="btn sm" id="margin">Change</button></div>` : ''}
-      </div></div>`).join('') : `<div class="card muted small">No quotes yet. Replies to the RFQ (with ${esc(r.ref)} in the subject) are attached here automatically.</div>`}
+      <div class="grow">
+        <div class="row between"><b>${esc(q.company || q.fromName)}</b>${q.status === 'selected' ? '<span class="badge selected">Selected</span>' : q.isBest ? '<span class="best">BEST FOR CLIENT</span>' : q.deltaPct != null ? `<span class="small muted">+${q.deltaPct}% vs best</span>` : ''}</div>
+        <div class="small muted">${esc([q.aircraft, q.year && 'YOM ' + q.year, q.tail].filter(Boolean).join(' · ') || 'Aircraft not stated')}${q.ageYears != null && q.ageYears > 15 ? ` <span style="color:var(--amber)">· ${q.ageYears} yrs old</span>` : ''}</div>
+        ${q.price != null ? `<div class="pricegrid">
+          <div><span>Operator</span><b>${money(q.price, q.currency)}</b></div>
+          <div><span>Your fee</span><b>${money(q.fee, q.currency)}</b></div>
+          <div><span>Client price</span><b class="price">${money(q.clientPrice, q.currency)}</b>${cmp.comparable && q.currency && q.currency !== cmp.base ? `<small>≈ ${money(q.clientPriceBase, cmp.base)}</small>` : ''}</div>
+        </div>` : '<div class="small" style="color:var(--amber);margin-top:6px">No price found in this reply. Tap Edit to enter it.</div>'}
+        <div class="row" style="margin-top:8px;justify-content:flex-end">
+          <button class="btn sm" data-view="${q.id}">Email</button><button class="btn sm" data-qedit="${q.id}">Edit</button>
+          ${r.invoiceId && q.status === 'selected' ? `<button class="btn sm primary" data-inv="${r.invoiceId}">View invoice</button>` : q.price != null ? `<button class="btn sm primary" data-issue="${q.id}">Invoice client</button>` : ''}
+        </div>
+      </div></div>`).join('') : `<div class="card muted small">No quotes yet. Replies to the RFQ (with ${esc(r.ref)} in the subject) are attached and compared here automatically.</div>`}
 
     <h3>RFQ distribution</h3>
     <div class="card"><div class="row between"><div><b>${sent}</b> sent${queued ? ` · <b>${queued}</b> queued` : ''} · <b>${repliedFrom.size}</b> replied</div><button class="btn sm primary" id="rfq">Send RFQ</button></div>
@@ -179,9 +191,11 @@ async function renderRequest(id) {
     <button class="btn danger block" style="margin-top:24px" id="del">Delete request</button>`;
 
   $('#status').onchange = async (e) => { await api(`/requests/${id}`, { method: 'PATCH', body: { status: e.target.value } }); toast('Status updated'); };
-  view.querySelectorAll('[data-pick]').forEach((b) => (b.onclick = async () => { await api(`/requests/${id}/quotes/${b.dataset.pick}`, { method: 'PATCH', body: { status: 'selected' } }); renderRequest(id); }));
+  view.querySelectorAll('[data-issue]').forEach((b) => (b.onclick = () => issueSheet(r, quotes.find((q) => q.id === b.dataset.issue))));
+  view.querySelectorAll('[data-inv]').forEach((b) => (b.onclick = async () => invoiceSheet(await api(`/invoices/${b.dataset.inv}`))));
+  view.querySelectorAll('[data-qedit]').forEach((b) => (b.onclick = () => quoteEditSheet(r, r.quotes.find((q) => q.id === b.dataset.qedit))));
+  $('#fee').onclick = () => feeSheet(r);
   view.querySelectorAll('[data-view]').forEach((b) => (b.onclick = () => { const q = r.quotes.find((x) => x.id === b.dataset.view); sheet(`<h2>${esc(q.company)}</h2><div class="small muted">${esc(q.fromEmail)} · ${ago(q.receivedAt)}</div><div class="email-src" style="margin-top:10px">${esc(q.snippet)}</div><a class="btn block" style="margin-top:12px" href="mailto:${esc(q.fromEmail)}?subject=${encodeURIComponent('RE: ' + r.ref)}">Reply</a>`); }));
-  const m = $('#margin'); if (m) m.onclick = async () => { const v = prompt('Margin %', r.margin ?? 10); if (v != null && !isNaN(+v)) { await api(`/requests/${id}`, { method: 'PATCH', body: { margin: +v } }); renderRequest(id); } };
   $('#del').onclick = async () => { if (confirm(`Delete ${r.ref}?`)) { await api(`/requests/${id}`, { method: 'DELETE' }); location.hash = '#/'; } };
   $('#rfq').onclick = () => rfqSheet(r);
   $('#edit').onclick = () => sheet(`<h2>Edit trip</h2>${legEditor(r.legs)}
@@ -191,6 +205,91 @@ async function renderRequest(id) {
     wireLegs(root);
     $('#sv').onclick = async () => { await api(`/requests/${id}`, { method: 'PATCH', body: { legs: readLegs(root), pax: +$('#px').value || null, category: $('#cat').value || null, notes: $('#nt').value || null } }); closeSheet(); renderRequest(id); };
   });
+}
+
+function feeSheet(r) {
+  const biz = state.business, f = r.fee || { type: biz.feeType, value: biz.feeValue, min: biz.feeMin };
+  sheet(`<h2>Brokerage fee for ${esc(r.ref)}</h2>
+    <p class="small muted">Added on top of every operator price on this trip. Your default is ${biz.feeType === 'fixed' ? money(biz.feeValue, biz.baseCurrency) : biz.feeValue + '%'}.</p>
+    <div class="grid2"><div><label>Type</label><select id="ft"><option value="percent" ${f.type === 'percent' ? 'selected' : ''}>Percentage</option><option value="fixed" ${f.type === 'fixed' ? 'selected' : ''}>Fixed amount</option></select></div>
+    <div><label>Value</label><input id="fv" type="number" step="0.01" value="${f.value ?? 0}"></div></div>
+    <label>Minimum fee (percentage only)</label><input id="fm" type="number" value="${f.min || 0}">
+    <div class="row" style="margin-top:14px"><button class="btn grow" id="fdef">Use default</button><button class="btn primary grow" id="fsv">Apply to this trip</button></div>`, () => {
+    $('#fsv').onclick = async () => { await api(`/requests/${r.id}`, { method: 'PATCH', body: { fee: { type: $('#ft').value, value: +$('#fv').value || 0, min: +$('#fm').value || 0 } } }); closeSheet(); renderRequest(r.id); };
+    $('#fdef').onclick = async () => { await api(`/requests/${r.id}`, { method: 'PATCH', body: { fee: null } }); closeSheet(); renderRequest(r.id); };
+  });
+}
+
+function quoteEditSheet(r, q) {
+  sheet(`<h2>Edit quote</h2><p class="small muted">${esc(q.company)}: correct anything the email parser missed.</p>
+    <div class="grid2"><div><label>Price</label><input id="qp" type="number" step="0.01" value="${q.price ?? ''}"></div><div><label>Currency</label><input id="qc" value="${esc(q.currency || state.business.baseCurrency)}" maxlength="3"></div></div>
+    <label>Aircraft</label><input id="qa" value="${esc(q.aircraft || '')}">
+    <button class="btn primary block" style="margin-top:14px" id="qsv">Save</button>`, () => {
+    $('#qsv').onclick = async () => {
+      await api(`/requests/${r.id}/quotes/${q.id}`, { method: 'PATCH', body: { price: $('#qp').value === '' ? null : +$('#qp').value, currency: $('#qc').value.toUpperCase(), aircraft: $('#qa').value } });
+      closeSheet(); renderRequest(r.id);
+    };
+  });
+}
+
+function issueSheet(r, q) {
+  const biz = state.business;
+  const t = Pricing.invoiceTotals(q, Pricing.effectiveFee(r, biz), biz);
+  const missing = [!r.client?.email && 'client email', !biz.name || biz.name === 'Your Brokerage Ltd' ? 'business name' : null, !biz.iban && 'bank details'].filter(Boolean);
+  sheet(`<h2>Invoice ${esc(r.client?.name || 'client')}</h2>
+    <p class="small muted">Issued under <b>${esc(biz.name)}</b> for the ${esc(q.company)} quote.</p>
+    ${missing.length ? `<div class="banner">Missing: ${missing.join(', ')}. ${missing.includes('client email') ? 'Edit the trip' : 'Fill in Settings → Business & invoicing'} before sending.</div>` : ''}
+    <div class="card">
+      ${t.lines.map((l) => `<div class="row between"><span>${l.kind === 'fee' ? 'Brokerage fee' : biz.feeDisplay === 'separate' ? 'Charter (operator price)' : 'Private charter (fee included)'}</span><b>${money(l.amount, t.currency)}</b></div>`).join('')}
+      ${t.vatRate ? `<div class="row between small muted" style="margin-top:6px"><span>VAT ${t.vatRate}%${biz.vatOn === 'fee' ? ' on fee' : ''}</span><span>${money(t.vat, t.currency)}</span></div>` : ''}
+      <div class="row between" style="margin-top:10px;font-size:18px"><span>Total</span><b>${money(t.total, t.currency)}</b></div>
+      <div class="small muted" style="margin-top:6px">You keep ${money(t.fee, t.currency)} · operator receives ${money(t.operatorPrice, t.currency)}</div>
+    </div>
+    <button class="btn primary block" id="iss">Issue invoice</button>`, () => {
+    $('#iss').onclick = async () => {
+      try { const inv = await api(`/requests/${r.id}/invoice`, { method: 'POST', body: { quoteId: q.id } }); toast(`Invoice ${inv.number} issued`); await renderRequest(r.id); invoiceSheet(inv); }
+      catch (e) { toast(e.message); }
+    };
+  });
+}
+
+function invoiceHtml(inv) {
+  const s = inv.seller;
+  return `<div class="invoice">
+    <div class="inv-head"><div><b class="inv-biz">${esc(s.name)}</b><div class="inv-small">${esc(s.address || '').replace(/\n/g, '<br>')}${s.taxId ? `<br>VAT / Tax no. ${esc(s.taxId)}` : ''}${s.regNo ? `<br>Reg. ${esc(s.regNo)}` : ''}</div></div>
+      <div style="text-align:right"><div class="inv-title">INVOICE</div><div class="inv-small">No. ${esc(inv.number)}<br>Issued ${esc(inv.issueDate)}<br>Due ${esc(inv.dueDate)}</div></div></div>
+    <div class="inv-small" style="margin:14px 0 4px;letter-spacing:.6px">BILL TO</div>
+    <div>${[inv.billTo.company, inv.billTo.name, inv.billTo.email].filter(Boolean).map(esc).join('<br>')}</div>
+    <table class="inv-table"><thead><tr><th>Description</th><th>${esc(inv.currency)}</th></tr></thead><tbody>
+      ${inv.lines.map((l) => `<tr><td><b>${esc(l.description)}</b>${l.detail ? `<div class="inv-small">${esc(l.detail)}</div>` : ''}</td><td>${money(l.amount, '')}</td></tr>`).join('')}
+      <tr class="sub"><td>Subtotal</td><td>${money(inv.subtotal, '')}</td></tr>
+      ${inv.vatRate ? `<tr class="sub"><td>VAT ${inv.vatRate}%${s.vatOn === 'fee' ? ' on fee' : ''}</td><td>${money(inv.vat, '')}</td></tr>` : ''}
+      <tr class="tot"><td>Total due</td><td>${money(inv.total, inv.currency)}</td></tr></tbody></table>
+    ${s.iban ? `<div class="inv-small">${[s.accountName, s.bankName, s.iban && 'IBAN ' + s.iban, s.swift && 'SWIFT ' + s.swift].filter(Boolean).map(esc).join(' · ')} · Ref ${esc(inv.number)}</div>` : ''}
+    ${s.invoiceNotes ? `<div class="inv-small" style="margin-top:8px">${esc(s.invoiceNotes)}</div>` : ''}
+  </div>`;
+}
+
+function invoiceSheet(inv) {
+  sheet(`<div class="row between"><h2>${esc(inv.number)}</h2><span class="badge inv-${inv.status}">${inv.status}${inv.sentSimulated ? ' (demo)' : ''}</span></div>
+    ${invoiceHtml(inv)}
+    <div class="grid2" style="margin-top:12px"><a class="btn" href="/invoices/${inv.id}.pdf" target="_blank" rel="noopener" id="pdf">Open PDF</a>
+      <button class="btn primary" id="snd">${inv.sentAt ? 'Send again' : 'Email to client'}</button></div>
+    <div class="grid2" style="margin-top:8px">${inv.status !== 'paid' ? '<button class="btn" id="paid">Mark paid</button>' : '<span></span>'}${inv.status !== 'void' && inv.status !== 'paid' ? '<button class="btn danger" id="void">Void</button>' : ''}</div>`, () => {
+    $('#snd').onclick = async () => { try { const x = await api(`/invoices/${inv.id}/send`, { method: 'POST' }); toast(x.sentSimulated ? 'Sent (demo, no real email)' : `Emailed to ${x.billTo.email}`); invoiceSheet(x); } catch (e) { toast(e.message); } };
+    const p = $('#paid'); if (p) p.onclick = async () => { invoiceSheet(await api(`/invoices/${inv.id}`, { method: 'PATCH', body: { status: 'paid' } })); toast('Marked paid · trip set to Won'); };
+    const v = $('#void'); if (v) v.onclick = async () => { if (confirm(`Void ${inv.number}?`)) invoiceSheet(await api(`/invoices/${inv.id}`, { method: 'PATCH', body: { status: 'void' } })); };
+  });
+}
+
+async function renderInvoices() {
+  const list = await api('/invoices');
+  const sum = (st) => { const by = {}; list.filter((i) => st.includes(i.status)).forEach((i) => (by[i.currency] = (by[i.currency] || 0) + i.total)); return Object.entries(by).map(([c, n]) => money(n, c)).join(' + ') || '0'; };
+  const fees = {}; list.filter((i) => i.status !== 'void').forEach((i) => (fees[i.currency] = (fees[i.currency] || 0) + i.fee));
+  view.innerHTML = `<h2>Invoices</h2>
+    <div class="stats" style="grid-template-columns:1fr 1fr"><div class="stat"><b style="font-size:17px">${sum(['issued', 'sent'])}</b><span>Outstanding</span></div><div class="stat"><b style="font-size:17px">${Object.entries(fees).map(([c, n]) => money(n, c)).join(' + ') || '0'}</b><span>Brokerage fees invoiced</span></div></div>
+    ${list.map((i) => `<div class="list-item" data-open="${i.id}"><div class="grow"><b>${esc(i.number)}</b> <span class="badge inv-${i.status}">${i.status}</span><div class="small muted">${esc(i.billTo.name || i.billTo.email || '')} · ${esc(i.requestRef)} · due ${esc(i.dueDate)}</div></div><b>${money(i.total, i.currency)}</b></div>`).join('') || '<div class="empty">No invoices yet.<br><span class="small">Open a trip, compare quotes and tap <b>Invoice client</b>.</span></div>'}`;
+  view.querySelectorAll('[data-open]').forEach((el) => (el.onclick = () => invoiceSheet(list.find((i) => i.id === el.dataset.open))));
 }
 
 async function rfqSheet(r) {
@@ -262,7 +361,7 @@ async function renderOutbox() {
 
 async function renderSettings() {
   await refreshState();
-  const s = state.settings, o = state.outlook;
+  const s = state.settings, o = state.outlook, b = state.business;
   const params = new URLSearchParams(location.hash.split('?')[1] || '');
   view.innerHTML = `<h2>Settings</h2>
     ${params.get('error') ? `<div class="banner">${esc(params.get('error'))}</div>` : ''}
@@ -277,6 +376,29 @@ async function renderSettings() {
     <h3>Automation</h3>
     <div class="card"><div class="row between"><div class="grow"><b>Auto-send RFQs</b><div class="small muted">When a charter request arrives, email every active broker & operator automatically.</div></div><label class="switch"><input type="checkbox" id="auto" ${s.autoSendRfq ? 'checked' : ''}><span></span></label></div>
       <div class="small muted" style="margin-top:8px">AI email parsing: <b>${state.aiEnabled ? 'Claude (on)' : 'off, using rule-based parsing (set ANTHROPIC_API_KEY)'}</b></div></div>
+
+    <h3>Business & invoicing</h3>
+    <div class="card">
+      <label style="margin-top:0">Business name (appears on invoices)</label><input id="b_name" value="${esc(b.name)}">
+      <label>Address</label><textarea id="b_address" style="min-height:70px">${esc(b.address)}</textarea>
+      <div class="grid2"><div><label>VAT / tax number</label><input id="b_taxId" value="${esc(b.taxId)}"></div><div><label>Company reg. no.</label><input id="b_regNo" value="${esc(b.regNo)}"></div></div>
+      <div class="grid2"><div><label>Email</label><input id="b_email" value="${esc(b.email)}"></div><div><label>Phone</label><input id="b_phone" value="${esc(b.phone)}"></div></div>
+      <div class="grid2"><div><label>Bank</label><input id="b_bankName" value="${esc(b.bankName)}"></div><div><label>Account name</label><input id="b_accountName" value="${esc(b.accountName)}"></div></div>
+      <div class="grid2"><div><label>IBAN</label><input id="b_iban" value="${esc(b.iban)}"></div><div><label>SWIFT / BIC</label><input id="b_swift" value="${esc(b.swift)}"></div></div>
+      <h3 style="margin-top:18px">Brokerage fee (default)</h3>
+      <div class="grid2"><div><label>Type</label><select id="b_feeType"><option value="percent" ${b.feeType === 'percent' ? 'selected' : ''}>Percentage</option><option value="fixed" ${b.feeType === 'fixed' ? 'selected' : ''}>Fixed amount</option></select></div>
+        <div><label>Value</label><input id="b_feeValue" type="number" step="0.01" value="${b.feeValue}"></div></div>
+      <div class="grid2"><div><label>Minimum fee</label><input id="b_feeMin" type="number" value="${b.feeMin}"></div>
+        <div><label>On invoice</label><select id="b_feeDisplay"><option value="bundled" ${b.feeDisplay === 'bundled' ? 'selected' : ''}>Included in charter price</option><option value="separate" ${b.feeDisplay === 'separate' ? 'selected' : ''}>Separate fee line</option></select></div></div>
+      <h3 style="margin-top:18px">Tax & currency</h3>
+      <div class="grid2"><div><label>VAT rate %</label><input id="b_vatRate" type="number" step="0.01" value="${b.vatRate}"></div>
+        <div><label>VAT applies to</label><select id="b_vatOn"><option value="total" ${b.vatOn === 'total' ? 'selected' : ''}>Whole invoice</option><option value="fee" ${b.vatOn === 'fee' ? 'selected' : ''}>Brokerage fee only</option></select></div></div>
+      <div class="grid2"><div><label>Base currency</label><input id="b_baseCurrency" value="${esc(b.baseCurrency)}" maxlength="3"></div><div><label>Payment terms (days)</label><input id="b_paymentTermsDays" type="number" value="${b.paymentTermsDays}"></div></div>
+      <label>Exchange rates to base (for comparing quotes)</label><input id="b_fx" placeholder="USD=3.75, EUR=4.05" value="${esc(Object.entries(b.fxRates || {}).map(([k, v]) => `${k}=${v}`).join(', '))}">
+      <div class="grid2"><div><label>Invoice prefix</label><input id="b_invoicePrefix" value="${esc(b.invoicePrefix)}"></div><div><label>Next invoice no.</label><input id="b_nextInvoiceNo" type="number" value="${b.nextInvoiceNo}"></div></div>
+      <label>Invoice footer / terms</label><textarea id="b_invoiceNotes" style="min-height:70px">${esc(b.invoiceNotes)}</textarea>
+      <button class="btn primary block" style="margin-top:12px" id="bsv">Save business details</button>
+    </div>
 
     <h3>RFQ email template</h3>
     <div class="card"><label style="margin-top:0">Your name / signature</label><input id="sn" value="${esc(s.senderName)}">
@@ -300,6 +422,12 @@ Alexander Grant
     <p class="small muted" style="text-align:center;margin-top:26px">Tip: on your phone, use "Add to Home Screen" to install SkyDesk as an app.</p>`;
 
   $('#auto').onchange = async (e) => { await api('/settings', { method: 'PUT', body: { autoSendRfq: e.target.checked } }); toast(e.target.checked ? 'Auto-RFQ on' : 'Auto-RFQ off'); };
+  $('#bsv').onclick = async () => {
+    const body = { fxText: $('#b_fx').value };
+    ['name', 'address', 'taxId', 'regNo', 'email', 'phone', 'bankName', 'accountName', 'iban', 'swift', 'feeType', 'feeValue', 'feeMin', 'feeDisplay', 'vatRate', 'vatOn', 'baseCurrency', 'paymentTermsDays', 'invoicePrefix', 'nextInvoiceNo', 'invoiceNotes']
+      .forEach((k) => (body[k] = $('#b_' + k).value));
+    state = await api('/business', { method: 'PUT', body }); toast('Business details saved');
+  };
   $('#svt').onclick = async () => { await api('/settings', { method: 'PUT', body: { senderName: $('#sn').value, template: { subject: $('#ts').value, body: $('#tb').value } } }); toast('Template saved'); };
   $('#rst').onclick = async () => { if (confirm('Reset template to default?')) { await api('/settings', { method: 'PUT', body: { resetTemplate: true } }); renderSettings(); } };
   const d = $('#disc'); if (d) d.onclick = async () => { if (confirm('Disconnect Outlook?')) { await fetch('/auth/disconnect', { method: 'POST' }); renderSettings(); } };
@@ -322,11 +450,12 @@ function renderLogin() {
 async function route() {
   const h = location.hash.slice(1) || '/';
   const [path] = h.split('?');
-  const tab = path.startsWith('/contacts') ? 'contacts' : path.startsWith('/outbox') ? 'outbox' : path.startsWith('/settings') ? 'settings' : 'requests';
+  const tab = path.startsWith('/invoices') ? 'invoices' : path.startsWith('/contacts') ? 'contacts' : path.startsWith('/outbox') ? 'outbox' : path.startsWith('/settings') ? 'settings' : 'requests';
   document.querySelectorAll('.tabs a').forEach((a) => a.classList.toggle('on', a.dataset.tab === tab));
   try {
     if (path.startsWith('/req/')) await renderRequest(path.split('/')[2]);
     else if (tab === 'contacts') await renderContacts();
+    else if (tab === 'invoices') await renderInvoices();
     else if (tab === 'outbox') await renderOutbox();
     else if (tab === 'settings') await renderSettings();
     else await renderRequests();

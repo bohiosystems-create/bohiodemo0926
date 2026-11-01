@@ -108,12 +108,15 @@ async function fetchNewMessages(sinceIso) {
   return out;
 }
 
-async function sendMail({ to, toName, subject, body }) {
+async function sendMail({ to, toName, subject, body, attachments = [] }) {
   await graph('POST', '/me/sendMail', {
     message: {
       subject,
       body: { contentType: 'Text', content: body },
       toRecipients: [{ emailAddress: { address: to, name: toName || to } }],
+      attachments: attachments.map((a) => ({
+        '@odata.type': '#microsoft.graph.fileAttachment', name: a.name, contentType: a.contentType, contentBytes: a.base64,
+      })),
     },
     saveToSentItems: true,
   });
