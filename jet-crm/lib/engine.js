@@ -2,6 +2,7 @@
 const store = require('./store');
 const graph = require('./graph');
 const { parseEmail } = require('./parser');
+const routing = require('./routing');
 
 const SENDS_PER_MINUTE = Number(process.env.SENDS_PER_MINUTE || 25); // Exchange Online caps at 30/min
 const listeners = new Set();
@@ -39,11 +40,11 @@ function rfqRecipients(excludeEmail) {
 }
 
 // ---------- RFQ dispatch ----------
-function queueRfqs(req, { onlyContactIds } = {}) {
+// Queues RFQ emails to the given contacts (ids chosen by routing or by hand).
+function queueRfqs(req, { onlyContactIds = [], reasons = {} } = {}) {
   const db = store.load();
   const t = db.settings.template;
-  let recipients = rfqRecipients(req.client.email);
-  if (onlyContactIds) recipients = recipients.filter((c) => onlyContactIds.includes(c.id));
+  const recipients = rfqRecipients(req.client.email).filter((c) => onlyContactIds.includes(c.id));
   const already = new Set(db.outbox.filter((o) => o.requestId === req.id).map((o) => o.contactId));
   const legs = req.legs.map((l, i) => `  ${i + 1}. ${l.from} → ${l.to}  ${l.date || 'date TBC'}${l.time ? ' ' + l.time : ''}`).join('\n');
   let n = 0;
@@ -57,6 +58,7 @@ function queueRfqs(req, { onlyContactIds } = {}) {
     db.outbox.push({
       id: store.id('out'), requestId: req.id, contactId: c.id, to: c.email, toName: c.name,
       subject: fill(t.subject, vars), body: fill(t.body, vars), status: 'queued', queuedAt: new Date().toISOString(),
+      reason: reasons[c.id] || 'chosen manually', foundOnline: c.source === 'web',
     });
     n++;
   }
@@ -66,6 +68,21 @@ function queueRfqs(req, { onlyContactIds } = {}) {
     store.log('rfq', `Queued ${n} RFQs for ${req.ref}`, { requestId: req.id });
   }
   store.save();
+  return n;
+}
+
+// Picks recipients by geography (searching the web if too few nearby operators are on file), then queues.
+async function autoRoute(req) {
+  const { contactIds, summary } = await routing.route(req, { live: live() });
+  const db = store.load();
+  const fresh = db.requests.find((r) => r.id === req.id);
+  if (!fresh) return 0;
+  fresh.routing = summary;
+  const where = summary.airport ? `${summary.airport.iata || summary.airport.icao}` : 'unknown departure';
+  store.log('routing', `${fresh.ref}: ${summary.nearby} operators within ${summary.radiusKm} km of ${where}, ${summary.worldwide} worldwide brokers${summary.discovered ? `, ${summary.discovered} found online` : ''}`, { requestId: fresh.id });
+  const n = queueRfqs(fresh, { onlyContactIds: contactIds, reasons: summary.reasons });
+  drainOutbox();
+  notify({ type: 'request', requestId: fresh.id });
   return n;
 }
 
@@ -146,7 +163,9 @@ async function handleEmail(email) {
   db.requests.unshift(newReq);
   store.log('request', `New request ${newReq.ref} from ${client.name || client.email}: ${routeLabel(newReq)}`, { requestId: newReq.id });
   store.save();
-  if (db.settings.autoSendRfq && newReq.legs.length) queueRfqs(newReq);
+  if (db.settings.autoSendRfq && newReq.legs.length) {
+    autoRoute(newReq).catch((e) => { console.error('[route]', e); store.log('routing', `Routing failed for ${newReq.ref}: ${e.message}`, { requestId: newReq.id }); store.save(); });
+  }
   notify({ type: 'request', requestId: newReq.id });
   return 'request';
 }
@@ -221,4 +240,4 @@ function start() {
   setInterval(() => drainOutbox().catch(() => {}), 10000);
 }
 
-module.exports = { start, poll, queueRfqs, drainOutbox, injectDemoEmail, routeLabel, live, onEvent: (fn) => (listeners.add(fn), () => listeners.delete(fn)) };
+module.exports = { start, poll, queueRfqs, autoRoute, drainOutbox, injectDemoEmail, routeLabel, live, onEvent: (fn) => (listeners.add(fn), () => listeners.delete(fn)) };

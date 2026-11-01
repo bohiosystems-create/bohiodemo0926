@@ -10,6 +10,8 @@ const { aiEnabled } = require('./lib/parser');
 const seed = require('./lib/seed');
 const invoices = require('./lib/invoice');
 const Pricing = require('./public/shared/pricing');
+const routing = require('./lib/routing');
+const geo = require('./lib/geo');
 
 const PORT = Number(process.env.PORT || 3000);
 const APP_PASSWORD = process.env.APP_PASSWORD || '';
@@ -67,8 +69,18 @@ function parseCsv(text) {
   return data.map((r) => Object.fromEntries(keys.map((k, i) => [k, (r[i] || '').trim()])));
 }
 
-const CONTACT_FIELDS = ['name', 'email', 'phone', 'company', 'type', 'rfqEnabled', 'region', 'fleet', 'notes', 'tags'];
+const CONTACT_FIELDS = ['name', 'email', 'phone', 'company', 'type', 'rfqEnabled', 'region', 'fleet', 'notes', 'tags', 'bases', 'global', 'website'];
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
+
+function routingView(r) {
+  const plan = routing.candidates(r, { live: engine.live() });
+  const sentTo = new Set(store.load().outbox.filter((o) => o.requestId === r.id).map((o) => o.contactId));
+  return {
+    airport: geo.brief(plan.dep), radiusKm: plan.cfg.radiusKm, nearby: plan.nearbyOperators, minOperators: plan.cfg.minOperators, aiEnabled: routing.aiEnabled(),
+    rows: plan.rows.map((x) => ({ id: x.contact.id, name: x.contact.name, company: x.contact.company, type: x.contact.type, include: x.include, reason: x.reason,
+      distanceKm: x.distanceKm, global: x.global, foundOnline: x.contact.source === 'web', sent: sentTo.has(x.contact.id) })),
+  };
+}
 
 function publicState() {
   const db = store.load();
@@ -130,7 +142,7 @@ async function api(req, res, url) {
       db.requests.unshift(r);
       store.log('request', `Manual request ${r.ref} created`, { requestId: r.id });
       store.save();
-      if (body.sendRfq) { engine.queueRfqs(r); engine.drainOutbox(); }
+      if (body.sendRfq) engine.autoRoute(r).catch((e) => console.error('[route]', e));
       return send(res, 201, r);
     }
     const r = db.requests.find((x) => x.id === b);
@@ -143,9 +155,19 @@ async function api(req, res, url) {
       return send(res, 200, r);
     }
     if (!c && M === 'DELETE') { db.requests = db.requests.filter((x) => x !== r); store.save(); return send(res, 200, { ok: true }); }
+    if (c === 'routing' && M === 'GET') return send(res, 200, routingView(r));
+    if (c === 'discover' && M === 'POST') {
+      const dep = routing.departure(r);
+      if (!dep) return send(res, 400, { error: 'Departure airport not recognised. Edit the trip and use an airport code like EGLF or LTN.' });
+      if (!routing.aiEnabled()) return send(res, 400, { error: 'Finding operators online needs ANTHROPIC_API_KEY on the server.' });
+      delete (db.discoveries || {})[dep.icao];
+      const out = await routing.discoverNearby(dep, db.settings.routing.minOperators);
+      return send(res, 200, { added: out.added.length, ...routingView(r) });
+    }
+    if (c === 'route' && M === 'POST') return send(res, 200, { queued: await engine.autoRoute(r) });
     if (c === 'rfq' && M === 'POST') {
       const body = await readBody(req);
-      const n = engine.queueRfqs(r, { onlyContactIds: body.contactIds });
+      const n = engine.queueRfqs(r, { onlyContactIds: body.contactIds || [] });
       engine.drainOutbox();
       return send(res, 200, { queued: n });
     }
@@ -181,7 +203,9 @@ async function api(req, res, url) {
           name: row.name || [row['first name'], row['last name']].filter(Boolean).join(' ') || email,
           company: row.company || row.organization || row.operator || '', phone: row.phone || row.mobile || '',
           type: ['broker', 'operator', 'client'].includes((row.type || '').toLowerCase()) ? row.type.toLowerCase() : (type || 'operator'),
-          region: row.region || row.base || '', fleet: row.fleet || row.aircraft || '', email,
+          region: row.region || row.city || row.country || '', bases: row.bases || row.base || row.icao || row.airport || '',
+          fleet: row.fleet || row.aircraft || '', email,
+          ...(row.worldwide || row.global ? { global: /^(y|yes|true|1)$/i.test(row.worldwide || row.global) } : {}),
         };
         const ex = db.contacts.find((x) => x.email === email);
         if (ex) { Object.assign(ex, Object.fromEntries(Object.entries(data).filter(([, v]) => v))); updated++; }
@@ -259,6 +283,13 @@ async function api(req, res, url) {
   if (a === 'settings' && M === 'PUT') {
     const body = await readBody(req);
     Object.assign(db.settings, pick(body, ['autoSendRfq', 'senderName']));
+    if (body.routing) {
+      const rt = body.routing;
+      db.settings.routing = {
+        mode: rt.mode === 'all' ? 'all' : 'nearby', radiusKm: Math.max(50, Number(rt.radiusKm) || 800),
+        minOperators: Math.max(0, Number(rt.minOperators) || 0), webDiscovery: Boolean(rt.webDiscovery), emailWebContacts: Boolean(rt.emailWebContacts),
+      };
+    }
     if (body.template?.subject && body.template?.body) db.settings.template = { subject: body.template.subject, body: body.template.body };
     if (body.resetTemplate) db.settings.template = store.DEFAULT_TEMPLATE;
     store.save();

@@ -62,7 +62,7 @@ function pdf(inv) {
     const s = inv.seller, gold = '#9a7b3a', ink = '#111827', mute = '#6b7280';
     const W = doc.page.width - 100;
 
-    doc.fillColor(ink).font('Helvetica-Bold').fontSize(20).text(s.name || 'Your Brokerage', 50, 50, { width: W * 0.6 });
+    doc.fillColor(ink).font('Helvetica-Bold').fontSize(20).text(s.name || 'Bohio', 50, 50, { width: W * 0.6 });
     doc.font('Helvetica').fontSize(9).fillColor(mute)
       .text([s.address, [s.email, s.phone].filter(Boolean).join('  ·  '), s.website, s.taxId && `VAT / Tax no. ${s.taxId}`, s.regNo && `Company reg. ${s.regNo}`].filter(Boolean).join('\n'), { width: W * 0.6 });
     doc.font('Helvetica-Bold').fontSize(22).fillColor(gold).text('INVOICE', 50, 50, { width: W, align: 'right' });

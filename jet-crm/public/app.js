@@ -183,9 +183,17 @@ async function renderRequest(id) {
         </div>
       </div></div>`).join('') : `<div class="card muted small">No quotes yet. Replies to the RFQ (with ${esc(r.ref)} in the subject) are attached and compared here automatically.</div>`}
 
-    <h3>RFQ distribution</h3>
-    <div class="card"><div class="row between"><div><b>${sent}</b> sent${queued ? ` · <b>${queued}</b> queued` : ''} · <b>${repliedFrom.size}</b> replied</div><button class="btn sm primary" id="rfq">Send RFQ</button></div>
-      <div class="rfq-list">${r.outbox.map((o) => `<div><span>${esc(o.toName || o.to)}${repliedFrom.has(o.to) ? ' <span style="color:var(--green)">· replied</span>' : ''}</span><span class="badge ${o.status}">${o.status}</span></div>`).join('') || '<div class="muted">Not sent yet</div>'}</div></div>
+    <h3>RFQ routing</h3>
+    <div class="card">
+      ${r.routing ? `<div class="route-head">
+          <div><span class="small muted">Departure</span><b>${r.routing.airport ? esc(`${r.routing.airport.name} (${r.routing.airport.iata || r.routing.airport.icao})`) : 'Not recognised'}</b>${r.routing.airport ? `<span class="small muted">${esc(r.routing.airport.country)}</span>` : ''}</div>
+        </div>
+        <div class="route-stats"><div><b>${r.routing.nearby}</b><span>operators within ${r.routing.radiusKm} km</span></div><div><b>${r.routing.worldwide}</b><span>worldwide brokers</span></div><div><b>${r.routing.discovered}</b><span>found online</span></div></div>
+        ${r.routing.discoveryNote ? `<div class="small muted" style="margin-top:6px">Online search: ${esc(r.routing.discoveryNote)}</div>` : ''}`
+      : r.status === 'new' && r.legs.length && state.settings.autoSendRfq ? '<div class="small muted">Finding operators near the departure airport…</div>' : ''}
+      <div style="margin-top:12px"><b>${sent}</b> sent${queued ? ` · <b>${queued}</b> queued` : ''} · <b>${repliedFrom.size}</b> replied</div>
+      <div class="grid2" style="margin-top:8px"><button class="btn sm" id="disco">Find operators online</button><button class="btn sm primary" id="rfq">Send RFQ</button></div>
+      <div class="rfq-list">${r.outbox.map((o) => `<div><span class="grow">${esc(o.toName || o.to)}${o.foundOnline ? ' <span class="badge web">online</span>' : ''}${repliedFrom.has(o.to) ? ' <span style="color:var(--green)">· replied</span>' : ''}<small>${esc(o.reason || '')}</small></span><span class="badge ${o.status}">${o.status}</span></div>`).join('') || '<div class="muted">Not sent yet</div>'}</div></div>
 
     ${r.source?.body ? `<h3>Original email</h3><div class="small muted" style="margin-bottom:6px">${esc(r.source.subject)} · ${ago(r.source.receivedAt)}</div><div class="email-src">${esc(r.source.body)}</div>` : ''}
     <button class="btn danger block" style="margin-top:24px" id="del">Delete request</button>`;
@@ -198,6 +206,11 @@ async function renderRequest(id) {
   view.querySelectorAll('[data-view]').forEach((b) => (b.onclick = () => { const q = r.quotes.find((x) => x.id === b.dataset.view); sheet(`<h2>${esc(q.company)}</h2><div class="small muted">${esc(q.fromEmail)} · ${ago(q.receivedAt)}</div><div class="email-src" style="margin-top:10px">${esc(q.snippet)}</div><a class="btn block" style="margin-top:12px" href="mailto:${esc(q.fromEmail)}?subject=${encodeURIComponent('RE: ' + r.ref)}">Reply</a>`); }));
   $('#del').onclick = async () => { if (confirm(`Delete ${r.ref}?`)) { await api(`/requests/${id}`, { method: 'DELETE' }); location.hash = '#/'; } };
   $('#rfq').onclick = () => rfqSheet(r);
+  $('#disco').onclick = async (e) => {
+    e.target.disabled = true; e.target.textContent = 'Searching the web…';
+    try { const x = await api(`/requests/${id}/discover`, { method: 'POST' }); toast(x.added ? `Added ${x.added} operators near ${x.airport.iata || x.airport.icao}` : 'No new verified operators found'); rfqSheet(r); }
+    catch (err) { toast(err.message); e.target.disabled = false; e.target.textContent = 'Find operators online'; }
+  };
   $('#edit').onclick = () => sheet(`<h2>Edit trip</h2>${legEditor(r.legs)}
     <div class="grid2"><div><label>Passengers</label><input id="px" type="number" value="${r.pax ?? ''}"></div><div><label>Category</label><input id="cat" value="${esc(r.category || '')}"></div></div>
     <label>Notes</label><textarea id="nt" style="min-height:70px">${esc(r.notes || '')}</textarea>
@@ -235,7 +248,7 @@ function quoteEditSheet(r, q) {
 function issueSheet(r, q) {
   const biz = state.business;
   const t = Pricing.invoiceTotals(q, Pricing.effectiveFee(r, biz), biz);
-  const missing = [!r.client?.email && 'client email', !biz.name || biz.name === 'Your Brokerage Ltd' ? 'business name' : null, !biz.iban && 'bank details'].filter(Boolean);
+  const missing = [!r.client?.email && 'client email', !biz.name ? 'business name' : null, !biz.iban && 'bank details'].filter(Boolean);
   sheet(`<h2>Invoice ${esc(r.client?.name || 'client')}</h2>
     <p class="small muted">Issued under <b>${esc(biz.name)}</b> for the ${esc(q.company)} quote.</p>
     ${missing.length ? `<div class="banner">Missing: ${missing.join(', ')}. ${missing.includes('client email') ? 'Edit the trip' : 'Fill in Settings → Business & invoicing'} before sending.</div>` : ''}
@@ -293,12 +306,18 @@ async function renderInvoices() {
 }
 
 async function rfqSheet(r) {
-  const contacts = (await api('/contacts')).filter((c) => c.type !== 'client' && c.rfqEnabled !== false && !(c.demo && state.outlook.live));
-  const done = new Set(r.outbox.map((o) => o.contactId));
-  const todo = contacts.filter((c) => !done.has(c.id));
-  sheet(`<h2>Send RFQ</h2><p class="muted small">Each contact gets an individual email (no shared recipients) using your RFQ template.</p>
-    ${todo.length ? todo.map((c) => `<label class="list-item" style="margin:0;color:var(--text)"><input type="checkbox" checked value="${c.id}" style="width:auto"><div class="grow"><b>${esc(c.company || c.name)}</b><div class="small muted">${esc(c.name)} · ${TYPES[c.type]}${c.region ? ' · ' + esc(c.region) : ''}</div></div></label>`).join('') : '<p class="muted">Every active broker/operator has already been sent this RFQ.</p>'}
-    <button class="btn primary block" style="margin-top:14px" id="go" ${todo.length ? '' : 'disabled'}>Send to selected</button>`, (root) => {
+  const rv = await api(`/requests/${r.id}/routing`);
+  const open = rv.rows.filter((x) => !x.sent && x.reason !== 'RFQs switched off');
+  const rec = open.filter((x) => x.include), other = open.filter((x) => !x.include);
+  const row = (x) => `<label class="list-item" style="margin:0;color:var(--text)"><input type="checkbox" ${x.include ? 'checked' : ''} value="${x.id}" style="width:auto">
+    <div class="grow"><b>${esc(x.company || x.name)}</b>${x.foundOnline ? ' <span class="badge web">online</span>' : ''}<div class="small muted">${TYPES[x.type]} · ${esc(x.reason)}</div></div></label>`;
+  sheet(`<h2>Send RFQ</h2>
+    <p class="muted small">${rv.airport ? `Departing ${esc(rv.airport.name)} (${esc(rv.airport.iata || rv.airport.icao)}). Operators within ${rv.radiusKm} km and worldwide brokers are ticked.` : 'Departure airport not recognised, so everyone is ticked. Edit the trip to add an airport code.'} Each contact gets their own email.</p>
+    ${rec.length ? `<h3>Recommended (${rec.length})</h3>${rec.map(row).join('')}` : ''}
+    ${other.length ? `<h3>Outside the area (${other.length})</h3>${other.map(row).join('')}` : ''}
+    ${!open.length ? '<p class="muted">Every active broker/operator has already been sent this RFQ.</p>' : ''}
+    ${rv.airport && rv.nearby < rv.minOperators ? `<div class="banner" style="margin-top:12px">Only ${rv.nearby} operator${rv.nearby === 1 ? '' : 's'} on file near ${esc(rv.airport.iata || rv.airport.icao)}. Use <b>Find operators online</b> on the trip to search the web for more.</div>` : ''}
+    <button class="btn primary block" style="margin-top:14px" id="go" ${open.length ? '' : 'disabled'}>Send to selected</button>`, (root) => {
     $('#go', root).onclick = async () => {
       const ids = [...root.querySelectorAll('input:checked')].map((i) => i.value);
       const { queued } = await api(`/requests/${r.id}/rfq`, { method: 'POST', body: { contactIds: ids } });
@@ -313,21 +332,24 @@ async function renderContacts() {
   const list = all.filter((c) => (contactType === 'all' || (contactType === 'supplier' ? c.type !== 'client' : c.type === 'client')))
     .filter((c) => !contactQ || `${c.name} ${c.company} ${c.email} ${c.region}`.toLowerCase().includes(contactQ.toLowerCase()))
     .sort((a, b) => (a.company || a.name || '').localeCompare(b.company || b.name || ''));
+  const noBase = all.filter((c) => c.type === 'operator' && !(c.global) && !c.bases && !c.region).length;
   view.innerHTML = `<div class="row between"><h2>Contacts</h2><button class="btn sm" id="imp">Import CSV</button></div>
+    ${noBase ? `<div class="banner">${noBase} operator${noBase === 1 ? ' has' : 's have'} no base airport, so ${noBase === 1 ? 'it' : 'they'} won't receive routed RFQs. Tap one to add its base (e.g. EGLF).</div>` : ''}
     <input placeholder="Search name, company, region…" id="q" value="${esc(contactQ)}">
     <div class="chips" style="margin-top:10px">${[['supplier', 'Brokers & operators'], ['client', 'Clients'], ['all', 'All']].map(([k, v]) => `<button class="chip ${k === contactType ? 'on' : ''}" data-t="${k}">${v}</button>`).join('')}</div>
     ${list.map((c) => `<div class="list-item"><div class="avatar">${initials(c.company || c.name)}</div>
-      <div class="grow" data-edit="${c.id}"><b>${esc(c.company || c.name)}</b>${c.demo ? ' <span class="badge">demo</span>' : ''}<div class="small muted">${esc(c.name)} · ${TYPES[c.type] || c.type}${c.region ? ' · ' + esc(c.region) : ''}</div><div class="small muted">${esc(c.email)}</div></div>
+      <div class="grow" data-edit="${c.id}"><b>${esc(c.company || c.name)}</b>${c.demo ? ' <span class="badge">demo</span>' : ''}${c.source === 'web' ? ' <span class="badge web">found online</span>' : ''}
+        <div class="small muted">${esc(c.name !== c.company ? c.name + ' · ' : '')}${TYPES[c.type] || c.type}${c.type !== 'client' ? ` · ${(c.global ?? c.type === 'broker') ? 'worldwide' : c.bases ? 'base ' + esc(c.bases) : '<span style="color:var(--amber)">no base airport</span>'}` : ''}</div><div class="small muted">${esc(c.email)}</div></div>
       ${c.type !== 'client' ? `<label class="switch" title="Include in automatic RFQs"><input type="checkbox" data-rfq="${c.id}" ${c.rfqEnabled !== false ? 'checked' : ''}><span></span></label>` : ''}</div>`).join('') || '<div class="empty">No contacts.</div>'}
-    <p class="small muted">Toggle = included in automatic RFQ blasts.</p>
+    <p class="small muted">Toggle = can receive RFQs. Operators get RFQs for trips departing within ${state.settings.routing.radiusKm} km of their base; worldwide brokers get every RFQ.</p>
     <button class="fab" id="add" aria-label="Add contact"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>`;
   $('#q').oninput = (e) => { contactQ = e.target.value; clearTimeout(renderContacts.t); renderContacts.t = setTimeout(async () => { await renderContacts(); const q = $('#q'); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }, 250); };
   view.querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => { contactType = b.dataset.t; renderContacts(); }));
   view.querySelectorAll('[data-rfq]').forEach((i) => (i.onchange = () => api(`/contacts/${i.dataset.rfq}`, { method: 'PATCH', body: { rfqEnabled: i.checked } })));
   view.querySelectorAll('[data-edit]').forEach((el) => (el.onclick = () => contactSheet(all.find((c) => c.id === el.dataset.edit))));
   $('#add').onclick = () => contactSheet();
-  $('#imp').onclick = () => sheet(`<h2>Import contacts</h2><p class="small muted">Paste CSV, or pick a file exported from Outlook, Excel or your old CRM. Columns recognised: name, email, company, phone, type (broker/operator/client), region, fleet.</p>
-    <input type="file" accept=".csv,text/csv" id="file"><textarea id="csv" placeholder="name,email,company,type,region&#10;Jane Doe,jane@op.com,Op Air,operator,Geneva"></textarea>
+  $('#imp').onclick = () => sheet(`<h2>Import contacts</h2><p class="small muted">Paste CSV, or pick a file exported from Outlook, Excel or your old CRM. Columns recognised: name, email, company, phone, type (broker/operator/client), base (airport codes like EGLF), worldwide (yes/no), region, fleet.</p>
+    <input type="file" accept=".csv,text/csv" id="file"><textarea id="csv" placeholder="name,email,company,type,base,worldwide&#10;Jane Doe,charter@opair.com,Op Air,operator,LSGG,no"></textarea>
     <label>Default type when no "type" column</label><select id="dt"><option value="operator">Operator</option><option value="broker">Broker</option><option value="client">Client</option></select>
     <button class="btn primary block" style="margin-top:12px" id="go">Import</button>`, () => {
     $('#file').onchange = async (e) => { $('#csv').value = await e.target.files[0].text(); };
@@ -339,12 +361,15 @@ function contactSheet(c = {}) {
     <label>Name</label><input id="n" value="${esc(c.name)}"><label>Company</label><input id="co" value="${esc(c.company)}">
     <label>Email</label><input id="e" type="email" value="${esc(c.email)}"><label>Phone</label><input id="p" type="tel" value="${esc(c.phone)}">
     <div class="grid2"><div><label>Type</label><select id="t">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${k === (c.type || 'operator') ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-    <div><label>Region / base</label><input id="rg" value="${esc(c.region)}"></div></div>
+    <div><label>Base airports</label><input id="bs" placeholder="EGLF, LTN" value="${esc(c.bases)}"></div></div>
+    <label>Region / city</label><input id="rg" value="${esc(c.region)}">
+    <div class="row between" style="margin-top:12px"><div class="grow"><b>Covers worldwide</b><div class="small muted">Gets every RFQ regardless of departure (typical for brokers).</div></div><label class="switch"><input type="checkbox" id="gl" ${(c.global ?? (c.type || 'operator') === 'broker') ? 'checked' : ''}><span></span></label></div>
     <label>Fleet / notes</label><input id="f" value="${esc(c.fleet)}">
+    ${c.source === 'web' ? `<p class="small muted">Found online for ${esc(c.foundFor || '')}. Source: <a href="${esc(c.sourceUrl)}" target="_blank" rel="noopener"><u>${esc(c.sourceUrl)}</u></a></p>` : ''}
     <button class="btn primary block" style="margin-top:14px" id="sv">Save</button>
     ${c.id ? '<button class="btn danger block" style="margin-top:8px" id="dl">Delete</button>' : ''}`, () => {
     $('#sv').onclick = async () => {
-      const body = { name: $('#n').value, company: $('#co').value, email: $('#e').value, phone: $('#p').value, type: $('#t').value, region: $('#rg').value, fleet: $('#f').value };
+      const body = { name: $('#n').value, company: $('#co').value, email: $('#e').value, phone: $('#p').value, type: $('#t').value, region: $('#rg').value, bases: $('#bs').value.toUpperCase(), global: $('#gl').checked, fleet: $('#f').value };
       try { await api(c.id ? `/contacts/${c.id}` : '/contacts', { method: c.id ? 'PATCH' : 'POST', body }); closeSheet(); renderContacts(); } catch (e) { toast(e.message); }
     };
     if (c.id) $('#dl').onclick = async () => { if (confirm('Delete contact?')) { await api(`/contacts/${c.id}`, { method: 'DELETE' }); closeSheet(); renderContacts(); } };
@@ -374,8 +399,18 @@ async function renderSettings() {
       : `<p class="small" style="margin:0">Outlook isn't configured on the server yet. Set <code>MS_CLIENT_ID</code> and <code>MS_CLIENT_SECRET</code> (see README) and restart. Until then SkyDesk runs on a demo inbox.</p>`}</div>
 
     <h3>Automation</h3>
-    <div class="card"><div class="row between"><div class="grow"><b>Auto-send RFQs</b><div class="small muted">When a charter request arrives, email every active broker & operator automatically.</div></div><label class="switch"><input type="checkbox" id="auto" ${s.autoSendRfq ? 'checked' : ''}><span></span></label></div>
+    <div class="card"><div class="row between"><div class="grow"><b>Auto-send RFQs</b><div class="small muted">When a charter request arrives, route it and email the matching brokers & operators automatically.</div></div><label class="switch"><input type="checkbox" id="auto" ${s.autoSendRfq ? 'checked' : ''}><span></span></label></div>
       <div class="small muted" style="margin-top:8px">AI email parsing: <b>${state.aiEnabled ? 'Claude (on)' : 'off, using rule-based parsing (set ANTHROPIC_API_KEY)'}</b></div></div>
+
+    <h3>RFQ routing</h3>
+    <div class="card">
+      <label style="margin-top:0">Send RFQs to</label>
+      <select id="r_mode"><option value="nearby" ${s.routing.mode === 'nearby' ? 'selected' : ''}>Operators near the departure airport + worldwide brokers</option><option value="all" ${s.routing.mode === 'all' ? 'selected' : ''}>Every active broker & operator</option></select>
+      <div class="grid2"><div><label>Radius (km)</label><input id="r_radius" type="number" value="${s.routing.radiusKm}"></div><div><label>Min. nearby operators</label><input id="r_min" type="number" value="${s.routing.minOperators}"></div></div>
+      <div class="row between" style="margin-top:12px"><div class="grow"><b>Search the web when too few</b><div class="small muted">If fewer nearby operators are on file than the minimum, Claude searches the internet for operators based near the departure airport and adds them to Contacts. Only emails published on the operator's own website are kept. ${state.aiEnabled ? '' : '<span style="color:var(--amber)">Needs ANTHROPIC_API_KEY.</span>'}</div></div><label class="switch"><input type="checkbox" id="r_web" ${s.routing.webDiscovery ? 'checked' : ''}><span></span></label></div>
+      <div class="row between" style="margin-top:12px"><div class="grow"><b>Email operators found online straight away</b><div class="small muted">Off = they're added to Contacts switched off, for you to review first.</div></div><label class="switch"><input type="checkbox" id="r_auto" ${s.routing.emailWebContacts ? 'checked' : ''}><span></span></label></div>
+      <button class="btn primary block" style="margin-top:12px" id="rsv">Save routing</button>
+    </div>
 
     <h3>Business & invoicing</h3>
     <div class="card">
@@ -422,6 +457,10 @@ Alexander Grant
     <p class="small muted" style="text-align:center;margin-top:26px">Tip: on your phone, use "Add to Home Screen" to install SkyDesk as an app.</p>`;
 
   $('#auto').onchange = async (e) => { await api('/settings', { method: 'PUT', body: { autoSendRfq: e.target.checked } }); toast(e.target.checked ? 'Auto-RFQ on' : 'Auto-RFQ off'); };
+  $('#rsv').onclick = async () => {
+    state = await api('/settings', { method: 'PUT', body: { routing: { mode: $('#r_mode').value, radiusKm: +$('#r_radius').value, minOperators: +$('#r_min').value, webDiscovery: $('#r_web').checked, emailWebContacts: $('#r_auto').checked } } });
+    toast('Routing saved');
+  };
   $('#bsv').onclick = async () => {
     const body = { fxText: $('#b_fx').value };
     ['name', 'address', 'taxId', 'regNo', 'email', 'phone', 'bankName', 'accountName', 'iban', 'swift', 'feeType', 'feeValue', 'feeMin', 'feeDisplay', 'vatRate', 'vatOn', 'baseCurrency', 'paymentTermsDays', 'invoicePrefix', 'nextInvoiceNo', 'invoiceNotes']

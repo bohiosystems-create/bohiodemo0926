@@ -23,10 +23,12 @@ const SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['from', 'to', 'date', 'time'],
+        required: ['from', 'to', 'fromCode', 'toCode', 'date', 'time'],
         properties: {
           from: { type: 'string' },
           to: { type: 'string' },
+          fromCode: { ...str, description: 'ICAO code of the departure airport if you can identify it (e.g. EGLF)' },
+          toCode: { ...str, description: 'ICAO code of the arrival airport if you can identify it' },
           date: { ...str, description: 'YYYY-MM-DD if known' },
           time: { ...str, description: 'HH:MM local if known' },
         },
@@ -51,7 +53,7 @@ const SYSTEM = `You are the intake assistant for a private jet charter brokerage
 - "charter_request": a client (or client-side contact) asking for a private flight / price / availability.
 - "quote": an operator or broker replying with a price and aircraft offer for a flight.
 - "other": newsletters, empty-leg blasts, invoices, spam, internal chatter, anything else.
-Airports: keep what the email says but prefer "City (ICAO/IATA)" when you can infer it. Resolve relative dates against the email's received date. Use null for anything unknown; never invent prices or passengers.`;
+Airports: keep what the email says but prefer "City (IATA)" when you can infer it, and fill fromCode/toCode with ICAO codes. When a city has several airports and the client names none, pick the main business-aviation airport (e.g. London → EGLF Farnborough or EGGW Luton, Paris → LFPB Le Bourget, New York → KTEB Teterboro, Dubai → OMDW Al Maktoum). Resolve relative dates against the email's received date. Use null for anything unknown; never invent prices or passengers.`;
 
 async function parseWithClaude(email, today) {
   const res = await client.beta.messages.create({

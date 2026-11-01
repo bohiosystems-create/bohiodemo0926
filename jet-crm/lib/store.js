@@ -29,14 +29,16 @@ const empty = () => ({
   settings: {
     autoSendRfq: true,
     pollSeconds: 60,
-    senderName: process.env.SENDER_NAME || 'Charter Desk',
+    senderName: process.env.SENDER_NAME || 'Bohio Charter Desk',
     template: DEFAULT_TEMPLATE,
     lastPollAt: null,
     lastPollStatus: 'never',
     lastPollError: null,
+    routing: { mode: 'nearby', radiusKm: 800, minOperators: 3, webDiscovery: true, emailWebContacts: true },
   },
+  discoveries: {},
   business: {
-    name: process.env.BUSINESS_NAME || 'Your Brokerage Ltd',
+    name: process.env.BUSINESS_NAME || 'Bohio',
     address: '', taxId: '', regNo: '', email: '', phone: '', website: '',
     bankName: '', accountName: '', iban: '', swift: '',
     baseCurrency: 'EUR', fxRates: {},
@@ -63,6 +65,8 @@ function load() {
     db = { ...empty(), ...JSON.parse(fs.readFileSync(FILE, 'utf8')) };
     db.settings = { ...empty().settings, ...db.settings };
     db.business = { ...empty().business, ...db.business };
+    db.settings.routing = { ...empty().settings.routing, ...db.settings.routing };
+    if (db.business.name === 'Your Brokerage Ltd') db.business.name = 'Bohio';
   } else {
     db = empty();
     save();
