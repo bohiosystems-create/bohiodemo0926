@@ -44,7 +44,9 @@ function endpointHtml(e) {
 const minsLeft = (iso) => Math.max(0, Math.ceil((Date.parse(iso) - Date.now()) / 60000));
 function offerState(r) {
   if (r.proposal?.status === 'pending') return { kind: 'pending', text: 'Offer ready: needs your approval' };
-  if (r.proposal?.status === 'sent') return { kind: 'sent', text: `Offer sent ${ago(r.proposal.sentAt)}` };
+  if (r.proposal?.status === 'sent') return { kind: r.proposal.needsReview ? 'pending' : 'sent', text: r.proposal.needsReview ? `Client replied: check quotation ${r.proposal.quotationNumber || ''}` : `Quotation ${r.proposal.quotationNumber || ''} sent · awaiting client` };
+  if (r.proposal?.status === 'awarded') return { kind: 'sent', text: `Awarded · invoice ${r.proposal.invoiceNumber || ''} ${r.proposal.invoiceSentAt ? 'sent' : 'issued'}` };
+  if (r.proposal?.status === 'declined') return { kind: 'sent', text: 'Client declined the quotation' };
   if (r.quoteWindow) { const m = minsLeft(r.quoteWindow.closesAt); return { kind: 'window', text: m ? `Collecting quotes · ${m} min left` : 'Picking the best quote…' }; }
   return null;
 }
@@ -90,6 +92,7 @@ function connectLive() {
       if (e.type === 'request') toast('✈ New charter request received');
       if (e.type === 'quote') toast('New quote received');
       if (e.type === 'proposal') toast('Offer ready for your approval');
+      if (e.type === 'award') toast('Flight awarded: invoice sent to the client');
       clearTimeout(connectLive.t);
       connectLive.t = setTimeout(() => { refreshState(); if (!$('#sheet').hidden || document.activeElement?.matches('input,textarea,select')) return; route(); }, 400);
     };
@@ -251,6 +254,8 @@ async function renderRequest(id) {
 
   $('#status').onchange = async (e) => { await api(`/requests/${id}`, { method: 'PATCH', body: { status: e.target.value } }); toast('Status updated'); };
   const ap = $('#approve'); if (ap) ap.onclick = () => approveSheet(r);
+  const aw = $('#awardBtn'); if (aw) aw.onclick = async () => { if (!confirm(`Mark ${r.ref} as awarded${state.settings.autoInvoiceOnAward ? ' and email the invoice to the client' : ''}?`)) return; try { await api(`/requests/${id}/award`, { method: 'POST' }); toast(state.settings.autoInvoiceOnAward ? 'Awarded: invoice sent' : 'Awarded: invoice issued'); renderRequest(id); } catch (e) { toast(e.message); } };
+  const dc = $('#declineBtn'); if (dc) dc.onclick = async () => { if (!confirm('Mark the quotation as declined? The trip moves to Lost.')) return; await api(`/requests/${id}/decline`, { method: 'POST' }); renderRequest(id); };
   const pn = $('#pickNow'); if (pn) pn.onclick = async () => { await api(`/requests/${id}/proposal/now`, { method: 'POST' }); renderRequest(id); };
   view.querySelectorAll('[data-issue]').forEach((b) => (b.onclick = () => issueSheet(r, quotes.find((q) => q.id === b.dataset.issue))));
   view.querySelectorAll('[data-inv]').forEach((b) => (b.onclick = async () => invoiceSheet(await api(`/invoices/${b.dataset.inv}`))));
@@ -304,10 +309,22 @@ function offerCard(r) {
       <div class="small" style="margin-top:6px">${esc(p.why)}</div>
       <button class="btn primary block" style="margin-top:12px" id="approve">Review & approve</button>
       <div class="small muted" style="margin-top:6px">Nothing is sent to the client until you approve.</div></div>`;
-  if (p?.status === 'sent') return `<h3>Offer to client</h3><div class="card offer">
-      <div class="row between"><b>${esc(p.company)} · ${esc(p.aircraft || '')}</b><span class="badge selected">sent${p.simulated ? ' (demo)' : ''}</span></div>
-      <div class="offer-price">${money(p.clientPrice, p.currency)} <span class="small muted">at ${p.feePct}% fee · approved ${ago(p.approvedAt)}</span></div>
+  if (['sent', 'awarded', 'declined'].includes(p?.status)) {
+    const expired = p.status === 'sent' && p.validUntil && Date.now() > Date.parse(p.validUntil);
+    const badge = p.status === 'awarded' ? 'awarded' : p.status === 'declined' ? 'declined' : expired ? 'expired' : 'awaiting client';
+    const validTxt = p.validUntil ? new Date(p.validUntil).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    return `<h3>Quotation</h3><div class="card offer ${p.status === 'sent' ? 'pending' : ''}">
+      <div class="row between"><b>${esc(p.quotationNumber || 'Offer')}</b><span class="badge ${p.status === 'awarded' ? 'selected' : ''}">${badge}</span></div>
+      <div class="small muted">${esc(p.company)} · ${esc(p.aircraft || '')} · ${p.feePct}% fee · sent ${ago(p.sentAt)}${p.simulated ? ' (demo)' : ''}${validTxt && p.status === 'sent' ? ` · valid until ${esc(validTxt)}` : ''}</div>
+      <div class="offer-price">${money(p.clientPrice, p.currency)}</div>
+      ${p.needsReview ? `<div class="banner" style="margin-top:8px">${esc(p.needsReview)}</div>` : ''}
+      ${p.status === 'sent' ? `<div class="small" style="margin-top:6px">When ${esc((r.client?.name || 'the client').split(' ')[0])} replies "Confirmed", the flight is marked awarded and the invoice is ${state.settings.autoInvoiceOnAward ? 'issued and emailed automatically' : 'issued for you to send'}.</div>
+        <div class="grid2" style="margin-top:10px"><button class="btn primary" id="awardBtn">Mark awarded</button><button class="btn" id="declineBtn">Client declined</button></div>` : ''}
+      ${p.status === 'awarded' ? `<div class="small" style="margin-top:6px">Awarded ${ago(p.awardedAt)} (${esc(p.awardSource || '')}). Invoice <b>${esc(p.invoiceNumber || '')}</b> ${p.invoiceSentAt ? 'emailed to ' + esc(r.client?.email || '') : 'issued'}${p.invoiceError ? ' · ' + esc(p.invoiceError) : ''}.</div>
+        <button class="btn block" style="margin-top:10px" data-inv="${p.invoiceId}">View invoice</button>` : ''}
+      ${p.quotationId ? `<a class="btn sm" style="margin-top:10px" href="/quotations/${p.quotationId}.pdf" target="_blank" rel="noopener">Quotation PDF</a>` : ''}
       <details class="rfq-item"><summary><span class="grow">Email sent to ${esc(r.client?.email || '')}<small>${esc(p.subject)}</small></span><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="mail"><div class="email-src">${esc(p.body)}</div></div></details></div>`;
+  }
   if (w) {
     const m = minsLeft(w.closesAt);
     return `<h3>Offer to client</h3><div class="card offer">
@@ -342,13 +359,14 @@ function approveSheet(r) {
     <h3>Email to ${esc(r.client?.email || 'client')}</h3>
     <input id="ap_subj"><textarea id="ap_body" style="min-height:240px;margin-top:8px"></textarea>
     <div class="small muted">The operator's name and tail number are not shown to the client.</div>
-    <button class="btn primary block" style="margin-top:12px" id="ap_go">Approve fee & send offer</button>`, (root) => {
+    <div class="small muted" style="margin-top:6px">Sent as a numbered quotation with a PDF attached, valid for ${state.settings.quoteValidityHours ?? 48} hours.</div>
+    <button class="btn primary block" style="margin-top:12px" id="ap_go">Approve fee & send quotation</button>`, (root) => {
     $('#ap_fee').oninput = (e) => { feePct = Math.max(0, +e.target.value || 0); edited = false; draw(root); };
     ['ap_subj', 'ap_body'].forEach((k) => ($('#' + k).oninput = () => (edited = true)));
     $('#ap_go').onclick = async () => {
       try {
         await api(`/requests/${r.id}/proposal/approve`, { method: 'POST', body: { quoteId: chosen, feePct, subject: $('#ap_subj').value, body: $('#ap_body').value } });
-        closeSheet(); toast('Offer sent to the client'); renderRequest(r.id);
+        closeSheet(); toast('Quotation sent to the client'); renderRequest(r.id);
       } catch (e) { toast(e.message); }
     };
     draw(root);
@@ -409,7 +427,7 @@ function invoiceHtml(inv) {
   const s = inv.seller;
   return `<div class="invoice">
     <div class="inv-head"><div><b class="inv-biz">${esc(s.name)}</b><div class="inv-small">${esc(s.address || '').replace(/\n/g, '<br>')}${s.taxId ? `<br>VAT / Tax no. ${esc(s.taxId)}` : ''}${s.regNo ? `<br>Reg. ${esc(s.regNo)}` : ''}</div></div>
-      <div style="text-align:right"><div class="inv-title">INVOICE</div><div class="inv-small">No. ${esc(inv.number)}<br>Issued ${esc(inv.issueDate)}<br>Due ${esc(inv.dueDate)}${inv.requestRef ? `<br>Ref ${esc(inv.requestRef)}` : ''}</div></div></div>
+      <div style="text-align:right"><div class="inv-title">INVOICE</div><div class="inv-small">No. ${esc(inv.number)}<br>Issued ${esc(inv.issueDate)}<br>Due ${esc(inv.dueDate)}${inv.quotationNumber ? `<br>Quotation ${esc(inv.quotationNumber)}` : ''}${inv.requestRef ? `<br>Ref ${esc(inv.requestRef)}` : ''}</div></div></div>
     <div class="inv-small" style="margin:14px 0 4px;letter-spacing:.6px">BILL TO</div>
     <div>${[inv.billTo.company, inv.billTo.name, inv.billTo.email].filter(Boolean).map(esc).join('<br>')}</div>
     <table class="inv-table"><thead><tr><th>Description</th><th>${esc(inv.currency)}</th></tr></thead><tbody>
@@ -642,6 +660,8 @@ async function renderSettings() {
     <div class="card">
       <div class="row between"><div class="grow"><b>Reply to the client instantly</b><div class="small muted">As soon as a request arrives, reply in the client's email thread to confirm you're on it.</div></div><label class="switch"><input type="checkbox" id="ack_on" ${s.autoAck ? 'checked' : ''}><span></span></label></div>
       <label>Wait for more quotes before recommending one (minutes after the first quote)</label><input id="qw_min" type="number" min="0" max="240" value="${s.quoteWindowMinutes ?? 30}">
+      <label>Quotations are valid for (hours)</label><input id="qv_hours" type="number" min="1" max="720" value="${s.quoteValidityHours ?? 48}">
+      <div class="row between" style="margin-top:12px"><div class="grow"><b>Invoice automatically when awarded</b><div class="small muted">When the client replies "Confirmed" to a quotation (or you mark it awarded), issue the invoice from the quotation and email it with the PDF.</div></div><label class="switch"><input type="checkbox" id="ai_on" ${s.autoInvoiceOnAward !== false ? 'checked' : ''}><span></span></label></div>
       <label>Reply text</label><textarea id="ack_tpl" style="min-height:200px">${esc(s.ackTemplate || '')}</textarea>
       <div class="small muted">Placeholders: {{clientFirstName}} {{clientName}} {{ref}} {{route}} {{date}} {{pax}} {{senderName}}</div>
       <div class="row between" style="margin-top:16px"><div class="grow"><b>Chase operators who haven't replied</b><div class="small muted">Sends a short follow-up in the same thread until they reply, the trip moves to Proposal/Won/Lost, or the limit is reached.</div></div><label class="switch"><input type="checkbox" id="fu_on" ${s.followUp?.enabled ? 'checked' : ''}><span></span></label></div>
@@ -671,7 +691,7 @@ Alexander Grant
     <p class="small muted" style="text-align:center;margin-top:26px">Tip: on your phone, use "Add to Home Screen" to install SkyDesk as an app.</p>`;
 
   $('#acksv').onclick = async () => {
-    state = await api('/settings', { method: 'PUT', body: { quoteWindowMinutes: +$('#qw_min').value, autoAck: $('#ack_on').checked, ackTemplate: $('#ack_tpl').value, followUp: { enabled: $('#fu_on').checked, everyMinutes: +$('#fu_every').value, maxPerOperator: +$('#fu_max').value } } });
+    state = await api('/settings', { method: 'PUT', body: { quoteWindowMinutes: +$('#qw_min').value, quoteValidityHours: +$('#qv_hours').value, autoInvoiceOnAward: $('#ai_on').checked, autoAck: $('#ack_on').checked, ackTemplate: $('#ack_tpl').value, followUp: { enabled: $('#fu_on').checked, everyMinutes: +$('#fu_every').value, maxPerOperator: +$('#fu_max').value } } });
     toast('Saved');
   };
   $('#auto').onchange = async (e) => { await api('/settings', { method: 'PUT', body: { autoSendRfq: e.target.checked } }); toast(e.target.checked ? 'Auto-RFQ on' : 'Auto-RFQ off'); };

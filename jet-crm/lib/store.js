@@ -49,6 +49,8 @@ Kind regards,
 {{senderName}}`,
     followUp: { enabled: true, everyMinutes: 15, maxPerOperator: 3 },
     quoteWindowMinutes: 30,  // after the first quote, wait this long for more before proposing
+    quoteValidityHours: 48,  // how long a quotation sent to a client is valid
+    autoInvoiceOnAward: true, // when the client accepts a quotation, issue and email the invoice automatically
   },
   discoveries: {},
   business: {
@@ -58,10 +60,11 @@ Kind regards,
     baseCurrency: 'EUR', fxRates: {}, fxAuto: true, fxLive: {}, fxOverrides: {}, fxBufferPct: 0, fxSource: null, fxUpdatedAt: null, fxError: null,
     feeType: 'percent', feeValue: 5, feeMin: 0, feeDisplay: 'bundled', feeStandardV: 2,
     vatRate: 0, vatOn: 'total',
-    invoicePrefix: 'INV', nextInvoiceNo: 1, paymentTermsDays: 3,
+    invoicePrefix: 'INV', nextInvoiceNo: 1, paymentTermsDays: 3, quotationPrefix: 'QUO', nextQuotationNo: 1,
     invoiceNotes: 'Payment is due in full before departure. Flights are subject to the operator\'s terms and conditions.',
   },
   invoices: [],
+  quotations: [],
   auth: null,            // Microsoft OAuth tokens
   processedMessageIds: [],
   contacts: [],          // brokers / operators / clients
@@ -82,6 +85,10 @@ function load() {
     db.settings.routing = { ...empty().settings.routing, ...db.settings.routing };
     db.settings.followUp = { ...empty().settings.followUp, ...db.settings.followUp };
     if (db.settings.autoAck === undefined) db.settings.autoAck = true;
+    if (db.settings.quoteValidityHours === undefined) db.settings.quoteValidityHours = 48;
+    if (db.settings.autoInvoiceOnAward === undefined) db.settings.autoInvoiceOnAward = true;
+    if (!db.business.quotationPrefix) { db.business.quotationPrefix = 'QUO'; db.business.nextQuotationNo = 1; }
+    db.quotations = db.quotations || [];
     if (!db.settings.ackTemplate) db.settings.ackTemplate = empty().settings.ackTemplate;
     if (db.business.feeStandardV !== 2) { db.business.feeType = 'percent'; db.business.feeValue = 5; db.business.feeStandardV = 2; } // standard fee is now 5%
     if (['Your Brokerage Ltd', 'Bohio'].includes(db.business.name)) db.business.name = 'Bohio Systems FZCO';

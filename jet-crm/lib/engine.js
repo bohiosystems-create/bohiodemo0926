@@ -1,7 +1,8 @@
 // Inbox poller, request/quote pipeline and rate-limited RFQ send queue.
 const store = require('./store');
 const graph = require('./graph');
-const { parseEmail } = require('./parser');
+const { parseEmail, classifyReply } = require('./parser');
+const invoices = require('./invoice');
 const routing = require('./routing');
 const geo = require('./geo');
 const Proposal = require('../public/shared/proposal');
@@ -167,18 +168,59 @@ async function approveProposal(req, { quoteId, feePct, subject, body }) {
   const row = ev.rows.find((r) => r.id === quoteId);
   if (!row || row.clientPriceTarget == null) throw Object.assign(new Error('This quote has no usable price.'), { status: 400 });
   const draft = Proposal.draftEmail(req, row, db.business, { senderName: db.settings.senderName, routeText: legText(req) });
-  const mail = { to: req.client.email, toName: req.client.name, subject: subject || draft.subject, body: body || draft.body };
-  if (live()) await graph.sendMail(mail);
+  const quo = invoices.createQuotation(req, quoteId, { validityHours: Number(db.settings.quoteValidityHours) || 48 });
+  const validTxt = `${quo.validUntil.slice(0, 16).replace('T', ' ')} UTC`;
+  const label = `Quotation ${quo.number} (valid until ${validTxt}) is attached. To book, simply reply "Confirmed" to this email and we will send your invoice straight away.`;
+  let text = body || draft.body;
+  text = text.replace('This offer is subject to availability at the time of confirmation. To book, simply reply to this email and we will send the contract and invoice.', `This offer is subject to availability at the time of confirmation. ${label}`);
+  if (!text.includes(quo.number)) text += `\n\n${label}`;
+  const subj = `Quotation ${quo.number} | ${req.ref} | ${(subject || draft.subject).replace(`${req.ref} | `, '')}`;
+  const mail = { to: req.client.email, toName: req.client.name, subject: subj, body: text };
+  if (live()) {
+    const buf = await invoices.pdf(quo);
+    await graph.sendMail({ ...mail, attachments: [{ name: `${quo.number}.pdf`, contentType: 'application/pdf', base64: buf.toString('base64') }] });
+  }
   req.quotes.forEach((x) => (x.status = x.id === quoteId ? 'selected' : x.status === 'selected' ? 'received' : x.status));
   req.proposal = { ...(req.proposal || {}), status: 'sent', quoteId, company: q.company, aircraft: q.aircraft, clientPrice: row.clientPriceTarget, currency: ev.target,
-    feePct: fee, subject: mail.subject, body: mail.body, approvedAt: new Date().toISOString(), sentAt: new Date().toISOString(), simulated: !live() };
+    feePct: fee, subject: mail.subject, body: mail.body, approvedAt: new Date().toISOString(), sentAt: new Date().toISOString(), simulated: !live(),
+    quotationId: quo.id, quotationNumber: quo.number, validUntil: quo.validUntil, clientPrice: quo.total, currency: quo.currency };
   req.status = 'proposal';
   req.updatedAt = new Date().toISOString();
-  store.log('proposal', `${req.ref}: you approved ${q.company} at ${fee}% fee; offer of ${ev.target} ${Math.round(row.clientPriceTarget).toLocaleString('en-US')} ${live() ? 'emailed' : 'sent (demo)'} to ${req.client.email}`, { requestId: req.id });
+  store.log('proposal', `${req.ref}: you approved ${q.company} at ${fee}% fee; quotation ${quo.number} for ${quo.currency} ${Math.round(quo.total).toLocaleString('en-US')} ${live() ? 'emailed' : 'sent (demo)'} to ${req.client.email}`, { requestId: req.id });
   store.save();
   notify({ type: 'request', requestId: req.id });
   return req;
 }
+// The client accepted the quotation (or you marked it awarded): issue the invoice from the quotation and email it.
+async function award(req, { source }) {
+  const db = store.load();
+  const p = req.proposal;
+  if (!p || p.status !== 'sent' || !p.quotationId) throw Object.assign(new Error('Send a quotation first; the invoice is issued from it.'), { status: 400 });
+  const quo = db.quotations.find((x) => x.id === p.quotationId);
+  quo.status = 'accepted';
+  p.status = 'awarded'; p.awardedAt = new Date().toISOString(); p.awardSource = source;
+  req.status = 'won';
+  store.log('award', `${req.ref}: flight awarded (${source}), quotation ${quo.number} accepted`, { requestId: req.id });
+  const inv = invoices.createFromQuotation(req, quo);
+  p.invoiceId = inv.id; p.invoiceNumber = inv.number;
+  if (db.settings.autoInvoiceOnAward) {
+    try { await invoices.sendInvoice(inv, { live: live(), graph, senderName: db.settings.senderName }); p.invoiceSentAt = inv.sentAt; }
+    catch (e) { p.invoiceError = e.message; store.log('invoice', `Invoice ${inv.number} issued but not sent: ${e.message}`, { requestId: req.id }); }
+  }
+  store.save();
+  notify({ type: 'award', requestId: req.id });
+  return req;
+}
+function decline(req, { source }) {
+  const db = store.load();
+  const p = req.proposal;
+  if (p) { p.status = 'declined'; p.declinedAt = new Date().toISOString(); p.declineSource = source; const quo = db.quotations.find((x) => x.id === p.quotationId); if (quo) quo.status = 'declined'; }
+  req.status = 'lost';
+  store.log('award', `${req.ref}: client declined the quotation (${source})`, { requestId: req.id });
+  store.save();
+  notify({ type: 'request', requestId: req.id });
+}
+
 function proposeNow(req) {
   if (!req.quoteWindow) openQuoteWindow(req);
   req.quoteWindow.closesAt = new Date().toISOString();
@@ -256,15 +298,27 @@ async function handleEmail(email) {
   const me = graph.account()?.email?.toLowerCase();
   if (me && email.fromEmail === me) return 'own';
 
-  const refMatch = email.subject.match(/RFQ-\d+/i);
-  const req = refMatch && db.requests.find((r) => r.ref.toUpperCase() === refMatch[0].toUpperCase());
+  const refMatch = email.subject.match(/RFQ-\d+/i) || email.body.slice(0, 3000).match(/RFQ-\d+/i);
+  let req = refMatch && db.requests.find((r) => r.ref.toUpperCase() === refMatch[0].toUpperCase());
+  // A client answering a quotation without the reference (e.g. replying to their own enquiry thread)
+  if (!req) req = db.requests.find((r) => r.proposal?.status === 'sent' && (r.client?.email || '').toLowerCase() === email.fromEmail);
   const parsed = await parseEmail(email);
 
   if (req && email.fromEmail === (req.client?.email || '').toLowerCase()) {
     req.clientMessages = req.clientMessages || [];
-    req.clientMessages.push({ at: email.receivedAt, subject: email.subject, body: email.body.slice(0, 4000) });
+    const msg = { at: email.receivedAt, subject: email.subject, body: email.body.slice(0, 4000) };
+    req.clientMessages.push(msg);
     req.updatedAt = new Date().toISOString();
     store.log('client', `${req.client.name || req.client.email} replied about ${req.ref}`, { requestId: req.id });
+    if (req.proposal?.status === 'sent') {
+      const c = await classifyReply(email);
+      msg.decision = c.decision; msg.decisionReason = c.reason;
+      const expired = req.proposal.validUntil && Date.now() > Date.parse(req.proposal.validUntil);
+      if (c.decision === 'accept' && !expired) await award(req, { source: 'client confirmed by email' });
+      else if (c.decision === 'accept' && expired) { req.proposal.needsReview = 'Client confirmed after the quotation expired. Check the price with the operator, then mark it awarded.'; store.log('award', `${req.ref}: client confirmed after quotation ${req.proposal.quotationNumber} expired. Waiting for you.`, { requestId: req.id }); }
+      else if (c.decision === 'decline') decline(req, { source: 'client declined by email' });
+      else if (c.decision === 'unclear') { req.proposal.needsReview = `Client replied but it's not a clear yes: ${c.reason}. Read the reply, then mark it awarded or not.`; }
+    }
     store.save();
     notify({ type: 'request', requestId: req.id });
     return 'client';
@@ -387,4 +441,4 @@ function start() {
   setInterval(() => drainOutbox().catch(() => {}), 10000);
 }
 
-module.exports = { start, poll, queueRfqs, autoRoute, runFollowUps, ackText, runProposals, approveProposal, proposeNow, buildProposal, drainOutbox, injectDemoEmail, routeLabel, live, onEvent: (fn) => (listeners.add(fn), () => listeners.delete(fn)) };
+module.exports = { start, poll, queueRfqs, autoRoute, runFollowUps, ackText, runProposals, approveProposal, proposeNow, buildProposal, award, decline, drainOutbox, injectDemoEmail, routeLabel, live, onEvent: (fn) => (listeners.add(fn), () => listeners.delete(fn)) };

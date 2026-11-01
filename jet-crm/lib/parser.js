@@ -144,6 +144,33 @@ function parseHeuristic(email) {
   };
 }
 
+// Reply from a client to a quotation: did they accept, decline, or something else (a question, a change)?
+const ACCEPT = /\b(confirm(ed)?|accept(ed)?|approved?|go ahead|book (it|this)|let'?s (go|proceed|book)|proceed|we'?ll take (it|this)|yes,? please|happy to proceed|deal)\b/i;
+const DECLINE = /\b(declin(e|ed)|not (interested|proceed|go ahead)|too (expensive|much)|cancel(led)?|pass on|no longer|won'?t (proceed|need)|found (another|something)|no,? thanks?)\b/i;
+const CHANGE = /\b(can (we|you)|could (we|you)|instead|change|add (a|an|one)|extra|different|\?)/i;
+function classifyReplyRules(text) {
+  const t = String(text || '').split(/\n(-{2,}|_{2,}|On .+ wrote:|From: )/)[0].slice(0, 1500); // ignore quoted history
+  if (DECLINE.test(t)) return { decision: 'decline', reason: 'reply declines the offer' };
+  if (ACCEPT.test(t) && !CHANGE.test(t.replace(/please/gi, ''))) return { decision: 'accept', reason: 'reply confirms the offer' };
+  if (ACCEPT.test(t)) return { decision: 'unclear', reason: 'confirms but also asks for a change' };
+  return { decision: 'other', reason: 'no confirmation in the reply' };
+}
+async function classifyReply(email) {
+  if (client) {
+    try {
+      const res = await client.beta.messages.create({
+        model: MODEL, max_tokens: 1000, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default',
+        output_config: { effort: 'low', format: { type: 'json_schema', schema: { type: 'object', additionalProperties: false, required: ['decision', 'reason'],
+          properties: { decision: { type: 'string', enum: ['accept', 'decline', 'unclear', 'other'] }, reason: { type: 'string' } } } } },
+        system: 'A private jet charter broker sent a client a quotation. Classify the client\'s reply. "accept" only if they clearly confirm/book the offer as quoted with no requested changes. "unclear" if they confirm but ask for changes or add conditions. "decline" if they turn it down. "other" for questions or anything else. Ignore quoted earlier messages.',
+        messages: [{ role: 'user', content: `Subject: ${email.subject}\n\n${String(email.body).slice(0, 6000)}` }],
+      });
+      if (res.stop_reason !== 'refusal') return { ...JSON.parse(res.content.filter((b) => b.type === 'text').map((b) => b.text).join('')), engine: 'claude' };
+    } catch (e) { console.error('[parser] classifyReply failed, using rules:', e.message); }
+  }
+  return { ...classifyReplyRules(`${email.body}`), engine: 'rules' };
+}
+
 async function parseEmail(email) {
   if (client) {
     try {
@@ -155,4 +182,4 @@ async function parseEmail(email) {
   return { ...parseHeuristic(email), engine: 'rules' };
 }
 
-module.exports = { parseEmail, parseHeuristic, aiEnabled: () => Boolean(client) };
+module.exports = { parseEmail, parseHeuristic, classifyReply, classifyReplyRules, aiEnabled: () => Boolean(client) };

@@ -180,6 +180,11 @@ async function api(req, res, url) {
       catch (e) { return send(res, e.status || 500, { error: e.message }); }
     }
     if (c === 'proposal' && d === 'now' && M === 'POST') { engine.proposeNow(r); return send(res, 200, r); }
+    if (c === 'award' && M === 'POST') {
+      try { return send(res, 200, await engine.award(r, { source: 'marked by you' })); }
+      catch (e) { return send(res, e.status || 500, { error: e.message }); }
+    }
+    if (c === 'decline' && M === 'POST') { engine.decline(r, { source: 'marked by you' }); return send(res, 200, r); }
     if (c === 'invoice' && M === 'POST') {
       const { quoteId } = await readBody(req);
       try { return send(res, 201, invoices.create(r, quoteId)); }
@@ -243,7 +248,7 @@ async function api(req, res, url) {
     const body = await readBody(req);
     const prevBase = db.business.baseCurrency;
     const fields = ['name', 'address', 'taxId', 'regNo', 'email', 'phone', 'website', 'bankName', 'accountName', 'iban', 'swift',
-      'baseCurrency', 'fxBufferPct', 'feeType', 'feeValue', 'feeMin', 'feeDisplay', 'vatRate', 'vatOn', 'invoicePrefix', 'nextInvoiceNo', 'paymentTermsDays', 'invoiceNotes'];
+      'baseCurrency', 'fxBufferPct', 'feeType', 'feeValue', 'feeMin', 'feeDisplay', 'vatRate', 'vatOn', 'invoicePrefix', 'nextInvoiceNo', 'paymentTermsDays', 'invoiceNotes', 'quotationPrefix'];
     Object.assign(db.business, pick(body, fields));
     for (const k of ['feeValue', 'feeMin', 'vatRate', 'nextInvoiceNo', 'paymentTermsDays', 'fxBufferPct']) db.business[k] = Number(db.business[k]) || 0;
     if (body.fxAuto !== undefined) db.business.fxAuto = Boolean(body.fxAuto);
@@ -279,19 +284,8 @@ async function api(req, res, url) {
       return send(res, 200, inv);
     }
     if (c === 'send' && M === 'POST') {
-      if (!inv.billTo.email) return send(res, 400, { error: 'The client has no email address. Add one on the request first.' });
-      const body = `Dear ${inv.billTo.name?.split(' ')[0] || 'Sir/Madam'},\n\nPlease find attached invoice ${inv.number} for your private charter (ref ${inv.requestRef}).\n\nTotal due: ${inv.currency} ${inv.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}\nDue date: ${inv.dueDate}\n\nKind regards,\n${db.settings.senderName}\n${inv.seller.name}`;
-      if (engine.live()) {
-        const buf = await invoices.pdf(inv);
-        await graph.sendMail({ to: inv.billTo.email, toName: inv.billTo.name, subject: `Invoice ${inv.number} | ${inv.seller.name}`, body,
-          attachments: [{ name: `${inv.number}.pdf`, contentType: 'application/pdf', base64: buf.toString('base64') }] });
-      }
-      inv.status = inv.status === 'paid' ? 'paid' : 'sent';
-      inv.sentAt = new Date().toISOString();
-      inv.sentSimulated = !engine.live();
-      store.log('invoice', `Invoice ${inv.number} ${engine.live() ? 'emailed' : 'sent (simulated)'} to ${inv.billTo.email}`, { requestId: inv.requestId });
-      store.save();
-      return send(res, 200, inv);
+      try { return send(res, 200, await invoices.sendInvoice(inv, { live: engine.live(), graph, senderName: db.settings.senderName })); }
+      catch (e) { return send(res, e.status || 500, { error: e.message }); }
     }
   }
 
@@ -303,6 +297,8 @@ async function api(req, res, url) {
   if (a === 'settings' && M === 'PUT') {
     const body = await readBody(req);
     Object.assign(db.settings, pick(body, ['autoSendRfq', 'senderName', 'autoAck']));
+    if (body.quoteValidityHours !== undefined) db.settings.quoteValidityHours = Math.max(1, Math.min(720, Number(body.quoteValidityHours) || 48));
+    if (body.autoInvoiceOnAward !== undefined) db.settings.autoInvoiceOnAward = Boolean(body.autoInvoiceOnAward);
     if (body.quoteWindowMinutes !== undefined) db.settings.quoteWindowMinutes = Math.max(0, Math.min(240, Number(body.quoteWindowMinutes) || 0));
     if (typeof body.ackTemplate === 'string' && body.ackTemplate.trim()) db.settings.ackTemplate = body.ackTemplate;
     if (body.followUp) db.settings.followUp = { enabled: Boolean(body.followUp.enabled), everyMinutes: Math.max(5, Number(body.followUp.everyMinutes) || 15), maxPerOperator: Math.max(1, Math.min(10, Number(body.followUp.maxPerOperator) || 3)) };
@@ -335,10 +331,10 @@ const server = http.createServer(async (req, res) => {
   try {
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
 
-    const pdfMatch = url.pathname.match(/^\/invoices\/(inv_[a-f0-9]+)\.pdf$/);
+    const pdfMatch = url.pathname.match(/^\/(?:invoices|quotations)\/((?:inv|qtn)_[a-f0-9]+)\.pdf$/);
     if (pdfMatch) {
       if (!authed(req)) return send(res, 401, { error: 'auth' });
-      const inv = store.load().invoices.find((x) => x.id === pdfMatch[1]);
+      const dbx = store.load(); const inv = dbx.invoices.find((x) => x.id === pdfMatch[1]) || dbx.quotations.find((x) => x.id === pdfMatch[1]);
       if (!inv) return send(res, 404, { error: 'Invoice not found' });
       const buf = await invoices.pdf(inv);
       res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${inv.number}.pdf"`, 'Cache-Control': 'no-store' });

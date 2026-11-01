@@ -15,7 +15,7 @@ function lineText(kind, r, q, inv) {
   }
   return {
     description: `Private jet charter: ${routeText(r)}`,
-    detail: [q.aircraft, q.year && `YOM ${q.year}`, q.tail, r.pax && `${r.pax} passengers`].filter(Boolean).join(' · '),
+    detail: [q.aircraft, q.year && `YOM ${q.year}`, r.pax && `${r.pax} passengers`].filter(Boolean).join(' · '), // no operator or tail on client documents
   };
 }
 
@@ -86,6 +86,74 @@ function createManual(body) {
   return inv;
 }
 
+// ---------- quotations ----------
+// A numbered quotation for the chosen quote, priced in the client's currency with the approved fee. Amounts are locked here,
+// so the invoice issued on award matches exactly what the client accepted, even if exchange rates move.
+function createQuotation(request, quoteId, { validityHours = 48 } = {}) {
+  const db = store.load();
+  const q = request.quotes.find((x) => x.id === quoteId);
+  if (!q) throw Object.assign(new Error('Quote not found'), { status: 404 });
+  if (q.price == null) throw Object.assign(new Error('This quote has no price.'), { status: 400 });
+  const biz = db.business;
+  const feeRule = Pricing.effectiveFee(request, biz);
+  const totals = Pricing.invoiceTotals(q, feeRule, biz, Pricing.clientCurrency(request, biz));
+  if (totals.error) throw Object.assign(new Error(totals.error), { status: 400 });
+  const issue = new Date();
+  const number = `${biz.quotationPrefix || 'QUO'}-${issue.getFullYear()}-${String(biz.nextQuotationNo || 1).padStart(4, '0')}`;
+  const quo = {
+    id: store.id('qtn'), kind: 'quotation', number, status: 'sent', requestId: request.id, requestRef: request.ref, quoteId: q.id,
+    issueDate: issue.toISOString().slice(0, 10), validUntil: new Date(issue.getTime() + validityHours * 3600000).toISOString(), createdAt: issue.toISOString(),
+    seller: { ...biz }, billTo: { name: request.client?.name, company: request.client?.company, email: request.client?.email, phone: request.client?.phone },
+    supplier: { company: q.company, aircraft: q.aircraft, tail: q.tail }, feeRule, ...totals,
+  };
+  quo.lines = totals.lines.map((l) => ({ ...l, ...lineText(l.kind, request, q, quo) }));
+  delete quo.seller.nextInvoiceNo; delete quo.seller.nextQuotationNo;
+  biz.nextQuotationNo = (Number(biz.nextQuotationNo) || 1) + 1;
+  db.quotations.unshift(quo);
+  store.save();
+  return quo;
+}
+
+// Invoice built from an accepted quotation: same lines, currency and totals.
+function createFromQuotation(request, quo) {
+  const db = store.load();
+  const existing = request.invoiceId && db.invoices.find((x) => x.id === request.invoiceId && x.status !== 'void');
+  if (existing) return existing;
+  const biz = db.business;
+  const issue = new Date();
+  const due = new Date(issue.getTime() + (Number(biz.paymentTermsDays) || 0) * 86400000);
+  const number = `${biz.invoicePrefix || 'INV'}-${issue.getFullYear()}-${String(biz.nextInvoiceNo || 1).padStart(4, '0')}`;
+  const inv = {
+    ...JSON.parse(JSON.stringify(quo)), id: store.id('inv'), kind: 'invoice', number, status: 'issued', quotationNumber: quo.number, quotationId: quo.id,
+    issueDate: issue.toISOString().slice(0, 10), dueDate: due.toISOString().slice(0, 10), createdAt: issue.toISOString(), seller: { ...biz },
+  };
+  delete inv.validUntil; delete inv.seller.nextInvoiceNo; delete inv.seller.nextQuotationNo;
+  biz.nextInvoiceNo = (Number(biz.nextInvoiceNo) || 1) + 1;
+  db.invoices.unshift(inv);
+  request.invoiceId = inv.id;
+  store.log('invoice', `Invoice ${number} issued from quotation ${quo.number}: ${inv.currency} ${inv.total.toLocaleString('en-US')}`, { requestId: request.id });
+  store.save();
+  return inv;
+}
+
+// Emails an invoice (PDF attached) to the client. live = Outlook connected.
+async function sendInvoice(inv, { live, graph, senderName }) {
+  if (!inv.billTo.email) throw Object.assign(new Error('The client has no email address. Add one on the request first.'), { status: 400 });
+  const body = `Dear ${inv.billTo.name?.split(' ')[0] || 'Sir/Madam'},\n\nThank you for confirming your flight. Please find attached invoice ${inv.number}${inv.quotationNumber ? ` for quotation ${inv.quotationNumber}` : ''} (ref ${inv.requestRef}).\n\nTotal due: ${inv.currency} ${inv.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}\nDue date: ${inv.dueDate}\n\nKind regards,\n${senderName}\n${inv.seller.name}`;
+  if (live) {
+    const buf = await pdf(inv);
+    await graph.sendMail({ to: inv.billTo.email, toName: inv.billTo.name, subject: `Invoice ${inv.number} | ${inv.requestRef || inv.seller.name}`, body,
+      attachments: [{ name: `${inv.number}.pdf`, contentType: 'application/pdf', base64: buf.toString('base64') }] });
+  }
+  inv.status = inv.status === 'paid' ? 'paid' : 'sent';
+  inv.sentAt = new Date().toISOString();
+  inv.sentSimulated = !live;
+  inv.sentBody = body;
+  store.log('invoice', `Invoice ${inv.number} ${live ? 'emailed' : 'sent (simulated)'} to ${inv.billTo.email}`, { requestId: inv.requestId });
+  store.save();
+  return inv;
+}
+
 const fmt = (n, c) => `${c} ${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 function pdf(inv) {
@@ -100,9 +168,10 @@ function pdf(inv) {
     doc.fillColor(ink).font('Helvetica-Bold').fontSize(20).text(s.name || 'Bohio', 50, 50, { width: W * 0.6 });
     doc.font('Helvetica').fontSize(9).fillColor(mute)
       .text([s.address, [s.email, s.phone].filter(Boolean).join('  ·  '), s.website, s.taxId && `VAT / Tax no. ${s.taxId}`, s.regNo && `Company reg. ${s.regNo}`].filter(Boolean).join('\n'), { width: W * 0.6 });
-    doc.font('Helvetica-Bold').fontSize(22).fillColor(gold).text('INVOICE', 50, 50, { width: W, align: 'right' });
+    const isQuo = inv.kind === 'quotation';
+    doc.font('Helvetica-Bold').fontSize(22).fillColor(gold).text(isQuo ? 'QUOTATION' : 'INVOICE', 50, 50, { width: W, align: 'right' });
     doc.font('Helvetica').fontSize(10).fillColor(ink)
-      .text(`No. ${inv.number}\nIssued ${inv.issueDate}\nDue ${inv.dueDate}${inv.requestRef ? `\nRef ${inv.requestRef}` : ''}`, 50, 80, { width: W, align: 'right' });
+      .text(`No. ${inv.number}\nIssued ${inv.issueDate}\n${isQuo ? `Valid until ${inv.validUntil.slice(0, 16).replace('T', ' ')} UTC` : `Due ${inv.dueDate}`}${inv.quotationNumber ? `\nQuotation ${inv.quotationNumber}` : ''}${inv.requestRef ? `\nRef ${inv.requestRef}` : ''}`, 50, 80, { width: W, align: 'right' });
 
     let y = Math.max(doc.y, 140) + 16;
     doc.moveTo(50, y).lineTo(50 + W, y).strokeColor('#e5e7eb').stroke();
@@ -133,10 +202,11 @@ function pdf(inv) {
     row('Subtotal', fmt(inv.subtotal, inv.currency));
     if (inv.vatRate) row(`VAT ${inv.vatRate}%${inv.seller.vatOn === 'fee' ? ' (on fee)' : ''}`, fmt(inv.vat, inv.currency));
     doc.moveTo(50 + W - 260, y).lineTo(50 + W, y).strokeColor(gold).stroke(); y += 8;
-    row('Total due', fmt(inv.total, inv.currency), true);
+    row(isQuo ? 'Total' : 'Total due', fmt(inv.total, inv.currency), true);
 
     y += 20;
-    if (s.iban || s.bankName) {
+    if (isQuo) { doc.font('Helvetica-Bold').fontSize(10).fillColor(ink).text('Subject to aircraft availability at the time of confirmation. To book, reply "Confirmed" to the email this quotation came with.', 50, y, { width: W }); y = doc.y + 14; }
+    if (!isQuo && (s.iban || s.bankName)) {
       doc.font('Helvetica-Bold').fontSize(9).fillColor(mute).text('PAYMENT DETAILS', 50, y);
       doc.font('Helvetica').fontSize(10).fillColor(ink).text([
         s.accountName && `Account name: ${s.accountName}`, s.bankName && `Bank: ${s.bankName}`, s.iban && `IBAN: ${s.iban}`, s.swift && `SWIFT/BIC: ${s.swift}`,
@@ -149,4 +219,4 @@ function pdf(inv) {
   });
 }
 
-module.exports = { create, createManual, pdf };
+module.exports = { create, createManual, createQuotation, createFromQuotation, sendInvoice, pdf };
