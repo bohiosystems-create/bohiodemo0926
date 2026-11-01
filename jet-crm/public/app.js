@@ -98,7 +98,7 @@ async function renderRequests() {
   const filters = { open: 'Open', all: 'All', ...STATUS };
   const shown = reqFilter === 'all' ? reqs : reqFilter === 'open' ? open : reqs.filter((r) => r.status === reqFilter);
   view.innerHTML = `
-    <div class="hero"><div><span class="eyebrow">${esc(state.business.name || 'Bohio')}</span><h1>Charter desk</h1><p>${open.length} open request${open.length === 1 ? '' : 's'} · inbox checked every minute</p></div></div>
+    <div class="hero" aria-hidden="true"></div>
     ${!state.outlook.live ? `<div class="banner">Demo mode: Outlook isn't connected. RFQs are simulated. <a href="#/settings"><u>Connect Outlook</u></a> or use <b>Simulate email</b> in Settings.</div>` : ''}
     <div class="stats">
       <div class="stat"><b>${open.length}</b><span>Open requests</span></div>
@@ -213,7 +213,8 @@ async function renderRequest(id) {
       ${r.routing ? `<div class="route-head">
           <div><span class="small muted">Departure</span><b>${r.routing.area ? esc(`${r.routing.area.name} area`) : r.routing.airport ? esc(`${r.routing.airport.name} (${r.routing.airport.iata || r.routing.airport.icao})`) : 'Not recognised'}</b>${r.routing.area ? `<span class="small muted">Airport flexible · distances from the nearest of ${esc(r.routing.area.airports.join(', '))}</span>` : r.routing.airport ? `<span class="small muted">${esc(r.routing.airport.country)}</span>` : ''}</div>
         </div>
-        <div class="route-stats"><div><b>${r.routing.nearby}</b><span>operators within ${r.routing.radiusKm} km</span></div><div><b>${r.routing.worldwide}</b><span>worldwide brokers</span></div><div><b>${r.routing.discovered}</b><span>found online</span></div></div>
+        <div class="route-stats"><div><b>${r.routing.nearby}</b><span>operators within ${r.routing.radiusKm} km</span></div><div><b>${r.routing.capable ?? '–'}</b><span>with a suitable fleet</span></div><div><b>${r.routing.worldwide}</b><span>worldwide brokers</span></div></div>
+        <div class="small muted" style="margin-top:6px">${r.routing.needs ? `Trip needs: ${r.routing.needs.pax ?? '?'} seats${r.routing.needs.category ? `, ${esc(r.routing.needs.category)} or larger` : ''}${r.routing.needs.longestLegKm ? `, ${r.routing.needs.longestLegKm.toLocaleString()} km longest leg` : ''}.` : ''}${r.routing.discovered ? ` ${r.routing.discovered} operator${r.routing.discovered === 1 ? '' : 's'} found online.` : ''}${r.routing.excludedUnsuitable ? ` ${r.routing.excludedUnsuitable} nearby operator${r.routing.excludedUnsuitable === 1 ? '' : 's'} skipped: fleet can't do this trip.` : ''}</div>
         ${r.routing.discoveryNote ? `<div class="small muted" style="margin-top:6px">Online search: ${esc(r.routing.discoveryNote)}</div>` : ''}`
       : r.status === 'new' && r.legs.length && state.settings.autoSendRfq ? '<div class="small muted">Finding operators near the departure airport…</div>' : ''}
       <div style="margin-top:12px"><b>${sent}</b> sent${queued ? ` · <b>${queued}</b> queued` : ''} · <b>${repliedFrom.size}</b> replied</div>
@@ -381,18 +382,24 @@ async function renderInvoices() {
 async function rfqSheet(r) {
   const rv = await api(`/requests/${r.id}/routing`);
   const open = rv.rows.filter((x) => !x.sent && x.reason !== 'RFQs switched off');
-  const rec = open.filter((x) => x.include), other = open.filter((x) => !x.include);
+  const tier = (n) => open.filter((x) => x.include && x.tier === n);
+  const unsuitable = open.filter((x) => !x.include && x.fit === 'unsuitable'), far = open.filter((x) => !x.include && x.fit !== 'unsuitable');
   const row = (x) => `<label class="list-item" style="margin:0;color:var(--text)"><input type="checkbox" ${x.include ? 'checked' : ''} value="${x.id}" style="width:auto">
-    <div class="grow"><b>${esc(x.company || x.name)}</b>${x.foundOnline ? ' <span class="badge web">online</span>' : ''}<div class="small muted">${TYPES[x.type]} · ${esc(x.reason)}</div></div></label>`;
+    <div class="grow"><b>${esc(x.company || x.name)}</b>${x.foundOnline ? ' <span class="badge web">online</span>' : ''}${x.tier === 1 ? ' <span class="badge selected">fleet fits</span>' : ''}<div class="small muted">${TYPES[x.type]} · ${esc(x.reason)}</div></div></label>`;
+  const group = (title, list) => (list.length ? `<h3>${title} (${list.length})</h3>${list.map(row).join('')}` : '');
+  const needs = rv.needs || {};
   sheet(`<h2>Send RFQ</h2>
     <p class="muted small">${rv.area ? `Departing the ${esc(rv.area.name)} area (${esc(rv.area.airports.join(', '))}).` : ''}${rv.airport && !rv.area ? `Departing ${esc(rv.airport.name)} (${esc(rv.airport.iata || rv.airport.icao)}).` : ''}${rv.airport ? ` Operators within ${rv.radiusKm} km and worldwide brokers are ticked.` : 'Departure airport not recognised, so everyone is ticked. Edit the trip to add an airport code.'} Each contact gets their own email.</p>
-    ${rec.length ? `<h3>Recommended (${rec.length})</h3>${rec.map(row).join('')}` : ''}
-    ${other.length ? `<h3>Outside the area (${other.length})</h3>${other.map(row).join('')}` : ''}
+    <p class="small muted">Sent in this order: nearby operators whose fleet fits (${needs.pax ?? '?'} seats${needs.category ? `, ${esc(needs.category)}+` : ''}${needs.longestLegKm ? `, ${needs.longestLegKm.toLocaleString()} km` : ''}), then nearby operators with no fleet on file, then worldwide brokers.</p>
+    ${group('1 · Nearby, fleet fits', tier(1))}${group('2 · Nearby, fleet unknown', tier(2))}${group('3 · Worldwide brokers', tier(3))}
+    ${group('Not suitable, fleet can\'t do this trip', unsuitable)}${group('Outside the area', far)}
     ${!open.length ? '<p class="muted">Every active broker/operator has already been sent this RFQ.</p>' : ''}
+    ${!tier(1).length && !tier(2).length && rv.airport ? '<div class="banner" style="margin-top:12px">No nearby operator with a suitable fleet on file. Add fleets to your operators in Contacts, or use <b>Find operators online</b>.</div>' : ''}
     ${rv.airport && rv.nearby < rv.minOperators ? `<div class="banner" style="margin-top:12px">Only ${rv.nearby} operator${rv.nearby === 1 ? '' : 's'} on file near ${esc(rv.airport.iata || rv.airport.icao)}. Use <b>Find operators online</b> on the trip to search the web for more.</div>` : ''}
     <button class="btn primary block" style="margin-top:14px" id="go" ${open.length ? '' : 'disabled'}>Send to selected</button>`, (root) => {
     $('#go', root).onclick = async () => {
-      const ids = [...root.querySelectorAll('input:checked')].map((i) => i.value);
+      const order = rv.rows.map((x) => x.id); // priority order from the routing
+      const ids = [...root.querySelectorAll('input:checked')].map((i) => i.value).sort((a, b) => order.indexOf(a) - order.indexOf(b));
       const { queued } = await api(`/requests/${r.id}/rfq`, { method: 'POST', body: { contactIds: ids } });
       closeSheet(); toast(`${queued} RFQs queued`); setTimeout(() => renderRequest(r.id), 800);
     };
@@ -412,7 +419,7 @@ async function renderContacts() {
     <div class="chips" style="margin-top:10px">${[['supplier', 'Brokers & operators'], ['client', 'Clients'], ['all', 'All']].map(([k, v]) => `<button class="chip ${k === contactType ? 'on' : ''}" data-t="${k}">${v}</button>`).join('')}</div>
     ${list.map((c) => `<div class="list-item"><div class="avatar">${initials(c.company || c.name)}</div>
       <div class="grow" data-edit="${c.id}"><b>${esc(c.company || c.name)}</b>${c.demo ? ' <span class="badge">demo</span>' : ''}${c.source === 'web' ? ' <span class="badge web">found online</span>' : ''}
-        <div class="small muted">${esc(c.name !== c.company ? c.name + ' · ' : '')}${TYPES[c.type] || c.type}${c.type !== 'client' ? ` · ${(c.global ?? c.type === 'broker') ? 'worldwide' : c.bases ? 'base ' + esc(c.bases) : '<span style="color:var(--amber)">no base airport</span>'}` : ''}</div><div class="small muted">${esc(c.email)}</div></div>
+        <div class="small muted">${esc(c.name !== c.company ? c.name + ' · ' : '')}${TYPES[c.type] || c.type}${c.type !== 'client' ? ` · ${(c.global ?? c.type === 'broker') ? 'worldwide' : c.bases ? 'base ' + esc(c.bases) : '<span style="color:var(--amber)">no base airport</span>'}` : ''}</div><div class="small muted">${esc(c.email)}</div>${c.type === 'operator' ? `<div class="small muted">${c.fleet ? 'Fleet: ' + esc(c.fleet) : '<span style="color:var(--amber)">no fleet on file</span>'}</div>` : ''}</div>
       ${c.type !== 'client' ? `<label class="switch" title="Include in automatic RFQs"><input type="checkbox" data-rfq="${c.id}" ${c.rfqEnabled !== false ? 'checked' : ''}><span></span></label>` : ''}</div>`).join('') || '<div class="empty">No contacts.</div>'}
     <p class="small muted">Toggle = can receive RFQs. Operators get RFQs for trips departing within ${state.settings.routing.radiusKm} km of their base; worldwide brokers get every RFQ.</p>
     <button class="fab" id="add" aria-label="Add contact"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>`;
@@ -437,7 +444,7 @@ function contactSheet(c = {}) {
     <div><label>Base airports</label><input id="bs" placeholder="EGLF, LTN" value="${esc(c.bases)}"></div></div>
     <label>Region / city</label><input id="rg" value="${esc(c.region)}">
     <div class="row between" style="margin-top:12px"><div class="grow"><b>Covers worldwide</b><div class="small muted">Gets every RFQ regardless of departure (typical for brokers).</div></div><label class="switch"><input type="checkbox" id="gl" ${(c.global ?? (c.type || 'operator') === 'broker') ? 'checked' : ''}><span></span></label></div>
-    <label>Fleet / notes</label><input id="f" value="${esc(c.fleet)}">
+    <label>Fleet (aircraft types, e.g. Citation XLS+, Challenger 350)</label><input id="f" value="${esc(c.fleet)}">
     <label>Preferred currency (clients)</label><select id="pc"><option value="">Use base currency</option>${curOptions(c.preferredCurrency)}</select>
     ${c.source === 'web' ? `<p class="small muted">Found online for ${esc(c.foundFor || '')}. Source: <a href="${esc(c.sourceUrl)}" target="_blank" rel="noopener"><u>${esc(c.sourceUrl)}</u></a></p>` : ''}
     <button class="btn primary block" style="margin-top:14px" id="sv">Save</button>

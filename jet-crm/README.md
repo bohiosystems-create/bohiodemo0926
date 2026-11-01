@@ -9,7 +9,8 @@ A mobile CRM (installable PWA for iPhone and Android) that watches your Outlook 
 4. If **Auto-send RFQs** is on, the request is **routed by geography**:
    - The departure airport is identified (Claude returns ICAO codes; the built-in table of ~7,700 airports resolves codes, airport names and nicknames such as "Biggin Hill", "Le Bourget" or "Dubai World Central").
    - **Cities with several airports**: if the client only names a city such as London, Paris, New York, Moscow, Dubai, Milan or Istanbul (about 30 cities, plus city codes like LON, PAR, NYC, MOW), the trip shows "airport not specified" with a **Choose airport** list (business-aviation airports first). Until you choose, RFQs say "London area, airport flexible (FAB, LTN, BQH, LCY, NHT, STN, LGW, LHR)" and routing measures distance from the nearest of those airports.
-   - **Operators** whose base airport is within the radius (default 800 km) get the RFQ. **Brokers** marked *covers worldwide* get every RFQ.
+   - **Operators** whose base airport is within the radius (default 800 km) get the RFQ, in priority order: first those whose **fleet is known to fit the trip** (enough seats, the requested category or larger, range for the longest leg), then those with no fleet on file. **Brokers** marked *covers worldwide* get every RFQ, after the operators. Operators whose known fleet can't do the trip (e.g. light jets for a 10-seat transatlantic request) are skipped, with the reason shown on the trip; you can still add them by hand.
+   - Fleet knowledge comes from each contact's **Fleet** field (aircraft types such as "Citation XLS+, Challenger 350", or classes such as "heavy jets"), matched against a built-in table of ~50 business-aviation types with seats and range (`public/shared/aircraft.js`). Operators found online get their fleet from their website.
    - If fewer nearby operators are on file than the minimum (default 3), **Claude searches the web** for charter operators based near that airport, opens their websites, and adds the ones whose quote/sales email is published on their own domain to Contacts (marked *found online*, with the source page). They are emailed straight away, or added switched off for review if you turn that option off. Each airport is searched at most once every 30 days.
    - If the departure airport can't be recognised, the RFQ goes to every active supplier and the trip says so.
    - Each RFQ goes **from your own mailbox** as an individual email, throttled under Exchange's 30 messages/minute limit. The trip shows who got it and why ("based LTN, 72 km away", "covers worldwide").
@@ -80,6 +81,7 @@ lib/engine.js      60s inbox poller, request/quote pipeline, throttled RFQ outbo
 lib/graph.js       Microsoft Graph OAuth + read inbox + sendMail
 lib/invoice.js     Invoice numbering, snapshot of business details, PDF rendering
 public/shared/pricing.js  Fee, currency conversion, quote ranking, invoice totals (shared by server and app)
+public/shared/aircraft.js Aircraft types, seats and range; judges whether a fleet can do a trip
 lib/routing.js     Geographic RFQ routing + Claude web search for operators near the departure airport
 lib/geo.js         Airport lookup (codes, names, nicknames, multi-airport cities) and distances
 lib/fx.js          Live exchange rates with manual overrides

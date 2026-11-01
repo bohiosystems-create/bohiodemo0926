@@ -180,7 +180,7 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--g
 h2 { letter-spacing: -0.02em; }
 h3 { color: #4f6a5a; }
 .tabs a { font-weight: 600; }
-.hero { position: relative; height: clamp(300px, 54vh, 620px); display: flex; align-items: flex-end; padding-bottom: 14px; pointer-events: none; }
+.hero { position: relative; height: clamp(280px, 50vh, 600px); display: flex; align-items: flex-end; padding-bottom: 14px; pointer-events: none; }
 .hero .eyebrow { display: block; font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
 .hero h1 { margin: 2px 0 0; font-size: clamp(26px, 6vw, 38px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
 .hero p { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; }

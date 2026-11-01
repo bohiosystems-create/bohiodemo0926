@@ -3,6 +3,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const store = require('./store');
 const geo = require('./geo');
+const Aircraft = require('../public/shared/aircraft');
 
 const MODEL = process.env.CLAUDE_MODEL || 'claude-opus-5-5';
 let client = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
@@ -18,31 +19,50 @@ const departurePlace = (req) => {
 const departure = (req) => departurePlace(req)?.primary || null;
 const areaOf = (p) => (p && !p.airport && p.ambiguous ? { name: p.metro.name, country: p.metro.country, airports: p.metro.airports.map(geo.code) } : null);
 
+// What the trip needs from an aircraft: passengers, category and the longest leg.
+function tripNeeds(req) {
+  let longest = 0;
+  for (const l of req.legs || []) {
+    const a = (l.fromCode && geo.resolve(l.fromCode)) || geo.resolve(l.from), b = (l.toCode && geo.resolve(l.toCode)) || geo.resolve(l.to);
+    if (a && b) longest = Math.max(longest, geo.distanceKm(a, b));
+  }
+  return { pax: req.pax, category: req.category, longestLegKm: longest };
+}
+
 // Ranks every supplier contact for a request. Pure: no side effects.
+// Tier 1: based nearby and fleet known to fit. Tier 2: based nearby, fleet unknown. Tier 3: worldwide brokers.
+// Operators whose known fleet can't do the trip, or who are based too far away, are left out (with the reason).
 function candidates(req, { live }) {
   const db = store.load();
   const cfg = db.settings.routing;
   const depPlace = departurePlace(req);
   const dep = depPlace?.primary || null;
   const depPoints = depPlace ? (depPlace.airport ? [depPlace.airport] : depPlace.metro.airports) : [];
+  const needs = tripNeeds(req);
   const rows = db.contacts
     .filter((c) => c.type !== 'client' && c.email && c.email !== req.client?.email && !(c.demo && live))
     .map((c) => {
       const bases = geo.contactBases(c);
       const nearest = dep && bases.length ? bases.flatMap((b) => depPoints.map((p) => ({ b, d: geo.distanceKm(p, b) }))).sort((x, y) => x.d - y.d)[0] : null;
-      let include = false, reason;
+      const global = isGlobal(c);
+      const fit = global ? { status: 'broker' } : Aircraft.fit(c.fleet, needs);
+      const where = nearest ? `based ${nearest.b.iata || nearest.b.icao}, ${nearest.d} km away` : null;
+      let include = false, reason, tier = 9;
       if (c.rfqEnabled === false) reason = 'RFQs switched off';
-      else if (cfg.mode === 'all') { include = true; reason = 'sending to all'; }
-      else if (!dep) { include = true; reason = 'departure airport not recognised, sent to all'; }
-      else if (isGlobal(c)) { include = true; reason = 'covers worldwide'; }
-      else if (nearest && nearest.d <= cfg.radiusKm) { include = true; reason = `based ${nearest.b.iata || nearest.b.icao}, ${nearest.d} km away`; }
-      else if (nearest) reason = `based ${nearest.b.iata || nearest.b.icao}, ${nearest.d} km away (outside ${cfg.radiusKm} km)`;
+      else if (!global && fit.status === 'unsuitable' && cfg.mode !== 'all') reason = `${where ? where + ' · ' : ''}${fit.reason}`;
+      else if (cfg.mode === 'all' || !dep) {
+        include = true; tier = global ? 3 : fit.status === 'capable' ? 1 : 2;
+        reason = `${!dep ? 'departure airport not recognised, sent to all' : 'sending to all'}${fit.reason && !global ? ' · ' + fit.reason : ''}`;
+      }
+      else if (global) { include = true; tier = 3; reason = 'broker, covers worldwide'; }
+      else if (nearest && nearest.d <= cfg.radiusKm) { include = true; tier = fit.status === 'capable' ? 1 : 2; reason = `${where} · ${fit.reason}`; }
+      else if (nearest) reason = `${where} (outside ${cfg.radiusKm} km)`;
       else reason = 'no base airport on file';
-      return { contact: c, include, reason, distanceKm: nearest?.d ?? null, global: isGlobal(c) };
+      return { contact: c, include, tier, reason, fit: fit.status, aircraft: fit.best || null, distanceKm: nearest?.d ?? null, global };
     })
-    .sort((a, b) => (b.include - a.include) || ((a.distanceKm ?? 1e9) - (b.distanceKm ?? 1e9)));
+    .sort((a, b) => (b.include - a.include) || (a.tier - b.tier) || ((a.distanceKm ?? 1e9) - (b.distanceKm ?? 1e9)));
   const nearbyOperators = rows.filter((r) => r.include && !r.global && r.distanceKm != null).length;
-  return { dep, area: areaOf(depPlace), rows, nearbyOperators, cfg };
+  return { dep, area: areaOf(depPlace), rows, nearbyOperators, cfg, needs };
 }
 
 // ---------- web discovery ----------
@@ -162,7 +182,8 @@ async function route(req, { live }) {
   const chosen = plan.rows.filter((r) => r.include);
   const summary = {
     airport: geo.brief(plan.dep), area: plan.area, radiusKm: cfg.radiusKm, mode: cfg.mode,
-    nearby: plan.nearbyOperators, worldwide: chosen.filter((r) => r.global).length,
+    nearby: plan.nearbyOperators, worldwide: chosen.filter((r) => r.global).length, capable: chosen.filter((r) => r.tier === 1).length,
+    excludedUnsuitable: plan.rows.filter((r) => !r.include && r.fit === 'unsuitable').length, needs: plan.needs,
     discovered: discovery?.added?.length || 0, discoveryNote: discovery?.skipped || discovery?.error || null,
     reasons: Object.fromEntries(chosen.map((r) => [r.contact.id, r.reason])),
     at: new Date().toISOString(),
@@ -170,4 +191,4 @@ async function route(req, { live }) {
   return { contactIds: chosen.map((r) => r.contact.id), summary };
 }
 
-module.exports = { _setClientForTests: (c) => (client = c), candidates, route, discoverNearby, departure, isGlobal, aiEnabled: () => Boolean(client) };
+module.exports = { _setClientForTests: (c) => (client = c), candidates, tripNeeds, route, discoverNearby, departure, isGlobal, aiEnabled: () => Boolean(client) };

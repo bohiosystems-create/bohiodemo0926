@@ -45,7 +45,8 @@ function rfqRecipients(excludeEmail) {
 function queueRfqs(req, { onlyContactIds = [], reasons = {} } = {}) {
   const db = store.load();
   const t = db.settings.template;
-  const recipients = rfqRecipients(req.client.email).filter((c) => onlyContactIds.includes(c.id));
+  const eligible = rfqRecipients(req.client.email);
+  const recipients = onlyContactIds.map((id) => eligible.find((c) => c.id === id)).filter(Boolean); // keep priority order
   const already = new Set(db.outbox.filter((o) => o.requestId === req.id).map((o) => o.contactId));
   const legs = req.legs.map((l, i) => `  ${i + 1}. ${geo.describe(l.from, l.fromCode)} → ${geo.describe(l.to, l.toCode)}  ${l.date || 'date TBC'}${l.time ? ' ' + l.time : ''}`).join('\n');
   let n = 0;
@@ -80,7 +81,7 @@ async function autoRoute(req) {
   if (!fresh) return 0;
   fresh.routing = summary;
   const where = summary.airport ? `${summary.airport.iata || summary.airport.icao}` : 'unknown departure';
-  store.log('routing', `${fresh.ref}: ${summary.nearby} operators within ${summary.radiusKm} km of ${where}, ${summary.worldwide} worldwide brokers${summary.discovered ? `, ${summary.discovered} found online` : ''}`, { requestId: fresh.id });
+  store.log('routing', `${fresh.ref}: ${summary.nearby} operators within ${summary.radiusKm} km of ${where} (${summary.capable} with a suitable fleet), ${summary.worldwide} worldwide brokers${summary.discovered ? `, ${summary.discovered} found online` : ''}${summary.excludedUnsuitable ? `, ${summary.excludedUnsuitable} skipped: fleet can't do it` : ''}`, { requestId: fresh.id });
   const n = queueRfqs(fresh, { onlyContactIds: contactIds, reasons: summary.reasons });
   drainOutbox();
   notify({ type: 'request', requestId: fresh.id });

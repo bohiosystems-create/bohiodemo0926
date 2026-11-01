@@ -80,7 +80,8 @@ function routingView(r) {
   const sentTo = new Set(store.load().outbox.filter((o) => o.requestId === r.id).map((o) => o.contactId));
   return {
     airport: geo.brief(plan.dep), area: plan.area, radiusKm: plan.cfg.radiusKm, nearby: plan.nearbyOperators, minOperators: plan.cfg.minOperators, aiEnabled: routing.aiEnabled(),
-    rows: plan.rows.map((x) => ({ id: x.contact.id, name: x.contact.name, company: x.contact.company, type: x.contact.type, include: x.include, reason: x.reason,
+    needs: plan.needs,
+    rows: plan.rows.map((x) => ({ id: x.contact.id, name: x.contact.name, company: x.contact.company, type: x.contact.type, include: x.include, reason: x.reason, tier: x.tier, fit: x.fit, aircraft: x.aircraft, fleet: x.contact.fleet || '',
       distanceKm: x.distanceKm, global: x.global, foundOnline: x.contact.source === 'web', sent: sentTo.has(x.contact.id) })),
   };
 }
