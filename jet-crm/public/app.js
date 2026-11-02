@@ -478,8 +478,18 @@ async function newInvoiceSheet() {
   const [contacts, reqs] = await Promise.all([api('/contacts'), api('/requests')]);
   const clients = contacts.filter((c) => c.type === 'client');
   const KINDS = { charter: 'Charter', fee: 'Brokerage fee', other: 'Other' };
+  // Ready-made line descriptions per line type. {route} is filled from the linked trip.
+  const PRESETS = {
+    charter: ['Private jet charter: {route}', 'Private jet charter, one way: {route}', 'Private jet charter, return: {route}', 'Empty-leg charter: {route}', 'Positioning flight (ferry)', 'Overnight crew costs', 'Additional flight hours'],
+    fee: ['Brokerage & arrangement fee', 'Booking & handling fee', 'Change / amendment fee', 'Cancellation fee', 'Late payment fee'],
+    other: ['Catering', 'Premium catering', 'Ground transfer (chauffeur)', 'VIP terminal / FBO fees', 'De-icing', 'Airport & handling fees', 'Landing & parking fees', 'Pet transport', 'Extra baggage / oversize items', 'Wi-Fi on board', 'Fuel surcharge', 'Discount'],
+  };
+  let linkedRoute = '';
+  const fillRoute = (t) => t.replace(': {route}', linkedRoute ? `: ${linkedRoute}` : '').replace('{route}', linkedRoute);
+  const presetOptions = (kind) => `<option value="">Choose a description…</option>${(PRESETS[kind] || []).map((p) => `<option value="${esc(p)}">${esc(fillRoute(p))}</option>`).join('')}<option value="__custom">Write my own</option>`;
   const lineRow = (l = {}) => `<div class="card inv-line" style="padding:10px" data-line>
       <div class="grid2"><select data-k="kind">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}" ${k === (l.kind || 'charter') ? 'selected' : ''}>${v}</option>`).join('')}</select><input data-k="amount" type="number" step="0.01" inputmode="decimal" placeholder="Amount" value="${l.amount ?? ''}"></div>
+      <select data-preset style="margin-top:8px" aria-label="Description">${presetOptions(l.kind || 'charter')}</select>
       <input data-k="description" style="margin-top:8px" placeholder="Description, e.g. Private jet charter LTN → NCE" value="${esc(l.description || '')}">
       <input data-k="detail" style="margin-top:8px" placeholder="Detail (optional), e.g. Challenger 350 · 6 passengers" value="${esc(l.detail || '')}">
       <button class="btn sm danger" type="button" data-rm style="margin-top:8px">Remove line</button></div>`;
@@ -503,11 +513,20 @@ async function newInvoiceSheet() {
         ${t.vatRate ? `<div class="row between small muted"><span>VAT ${t.vatRate}%${biz.vatOn === 'fee' ? ' on fee' : ''}</span><span>${money(t.vat, cur)}</span></div>` : ''}
         <div class="row between" style="font-size:18px;margin-top:6px"><span>Total</span><b>${money(t.total, cur)}</b></div>`;
     };
-    const wire = () => { root.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { if (root.querySelectorAll('[data-line]').length > 1) b.closest('[data-line]').remove(); totals(); })); root.querySelectorAll('[data-line] input, [data-line] select').forEach((i) => (i.oninput = totals)); };
+    const wirePresets = () => root.querySelectorAll('[data-line]').forEach((el) => {
+      const kind = el.querySelector('[data-k=kind]'), pre = el.querySelector('[data-preset]'), desc = el.querySelector('[data-k=description]');
+      kind.onchange = () => { pre.innerHTML = presetOptions(kind.value); totals(); };
+      pre.onchange = () => { if (pre.value === '__custom') { desc.value = ''; desc.focus(); } else if (pre.value) desc.value = fillRoute(pre.value); pre.value = ''; };
+    });
+    const wire = () => { wirePresets(); root.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { if (root.querySelectorAll('[data-line]').length > 1) b.closest('[data-line]').remove(); totals(); })); root.querySelectorAll('[data-line] input, [data-line] select').forEach((i) => (i.oninput = totals)); };
     $('#ni_add').onclick = () => { $('#ni_lines').insertAdjacentHTML('beforeend', lineRow({ kind: 'fee' })); wire(); totals(); };
     $('#ni_cur').onchange = totals;
     $('#ni_pick').onchange = (e) => { const c = clients.find((x) => x.id === e.target.value) || {}; $('#ni_name').value = c.name || ''; $('#ni_company').value = c.company || ''; $('#ni_email').value = c.email || ''; $('#ni_phone').value = c.phone || ''; if (c.preferredCurrency) { $('#ni_cur').value = c.preferredCurrency; totals(); } };
-    $('#ni_req').onchange = (e) => { const r = reqs.find((x) => x.id === e.target.value); if (!r) return; if (!$('#ni_name').value) { $('#ni_name').value = r.client?.name || ''; $('#ni_email').value = r.client?.email || ''; $('#ni_company').value = r.client?.company || ''; } if (r.currency) { $('#ni_cur').value = r.currency; totals(); } };
+    $('#ni_req').onchange = (e) => {
+      const r = reqs.find((x) => x.id === e.target.value);
+      linkedRoute = r ? r.legs.map((l) => `${l.from} → ${l.to}`).join(', ') : '';
+      root.querySelectorAll('[data-line]').forEach((el) => { el.querySelector('[data-preset]').innerHTML = presetOptions(el.querySelector('[data-k=kind]').value); });
+      if (!r) return; if (!$('#ni_name').value) { $('#ni_name').value = r.client?.name || ''; $('#ni_email').value = r.client?.email || ''; $('#ni_company').value = r.client?.company || ''; } if (r.currency) { $('#ni_cur').value = r.currency; totals(); } };
     $('#ni_go').onclick = async () => {
       try {
         const inv = await api('/invoices', { method: 'POST', body: { billTo: { name: $('#ni_name').value, company: $('#ni_company').value, email: $('#ni_email').value, phone: $('#ni_phone').value },
