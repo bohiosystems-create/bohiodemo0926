@@ -32,7 +32,7 @@ function create(request, quoteId) {
   if (totals.error) throw Object.assign(new Error(totals.error), { status: 400 });
   const issue = new Date();
   const due = new Date(issue.getTime() + (Number(biz.paymentTermsDays) || 0) * 86400000);
-  const number = `${biz.invoicePrefix || 'INV'}-${issue.getFullYear()}-${String(biz.nextInvoiceNo || 1).padStart(4, '0')}`;
+  const number = Pricing.invoiceNumber(db.invoices.map((x) => x.number), biz.invoicePrefix || 'INV', issue);
   const inv = {
     id: store.id('inv'), number, status: 'issued', requestId: request.id, requestRef: request.ref, quoteId: q.id,
     issueDate: issue.toISOString().slice(0, 10), dueDate: due.toISOString().slice(0, 10), createdAt: issue.toISOString(),
@@ -43,7 +43,6 @@ function create(request, quoteId) {
   };
   inv.lines = totals.lines.map((l) => ({ ...l, ...lineText(l.kind, request, q, inv) }));
   delete inv.seller.nextInvoiceNo;
-  biz.nextInvoiceNo = (Number(biz.nextInvoiceNo) || 1) + 1;
   db.invoices.unshift(inv);
   q.status = 'selected';
   request.quotes.forEach((x) => { if (x !== q && x.status === 'selected') x.status = 'received'; });
@@ -68,7 +67,7 @@ function createManual(body) {
   const t = Pricing.manualTotals(lines, biz);
   const issue = new Date();
   const due = new Date(issue.getTime() + (Number(body.paymentTermsDays ?? biz.paymentTermsDays) || 0) * 86400000);
-  const number = `${biz.invoicePrefix || 'INV'}-${issue.getFullYear()}-${String(biz.nextInvoiceNo || 1).padStart(4, '0')}`;
+  const number = Pricing.invoiceNumber(db.invoices.map((x) => x.number), biz.invoicePrefix || 'INV', issue);
   const req = body.requestId && db.requests.find((r) => r.id === body.requestId);
   const inv = {
     id: store.id('inv'), number, status: 'issued', manual: true, requestId: req?.id || null, requestRef: req?.ref || body.reference || '',
@@ -78,7 +77,6 @@ function createManual(body) {
   };
   if (inv.notes) inv.seller.invoiceNotes = [inv.notes, biz.invoiceNotes].filter(Boolean).join('\n');
   delete inv.seller.nextInvoiceNo;
-  biz.nextInvoiceNo = (Number(biz.nextInvoiceNo) || 1) + 1;
   db.invoices.unshift(inv);
   if (req && !req.invoiceId) { req.invoiceId = inv.id; if (['new', 'rfq_sent', 'quoting'].includes(req.status)) req.status = 'proposal'; }
   store.log('invoice', `Invoice ${number} issued to ${inv.billTo.company || inv.billTo.name}: ${currency} ${inv.total.toLocaleString('en-US')}`, req ? { requestId: req.id } : {});
@@ -122,13 +120,12 @@ function createFromQuotation(request, quo) {
   const biz = db.business;
   const issue = new Date();
   const due = new Date(issue.getTime() + (Number(biz.paymentTermsDays) || 0) * 86400000);
-  const number = `${biz.invoicePrefix || 'INV'}-${issue.getFullYear()}-${String(biz.nextInvoiceNo || 1).padStart(4, '0')}`;
+  const number = Pricing.invoiceNumber(db.invoices.map((x) => x.number), biz.invoicePrefix || 'INV', issue);
   const inv = {
     ...JSON.parse(JSON.stringify(quo)), id: store.id('inv'), kind: 'invoice', number, status: 'issued', quotationNumber: quo.number, quotationId: quo.id,
     issueDate: issue.toISOString().slice(0, 10), dueDate: due.toISOString().slice(0, 10), createdAt: issue.toISOString(), seller: { ...biz },
   };
   delete inv.validUntil; delete inv.seller.nextInvoiceNo; delete inv.seller.nextQuotationNo;
-  biz.nextInvoiceNo = (Number(biz.nextInvoiceNo) || 1) + 1;
   db.invoices.unshift(inv);
   request.invoiceId = inv.id;
   store.log('invoice', `Invoice ${number} issued from quotation ${quo.number}: ${inv.currency} ${inv.total.toLocaleString('en-US')}`, { requestId: request.id });

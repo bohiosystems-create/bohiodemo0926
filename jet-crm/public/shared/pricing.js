@@ -121,5 +121,15 @@
     return { subtotal, fee, vatRate, vat, total: round2(subtotal + vat) };
   }
 
-  return { manualTotals, CURRENCIES, rateToBase, crossRate, convert, feeFor, minApplied, effectiveFee, clientCurrency, compareQuotes, invoiceTotals, parseFx, sumIn, round2 };
+  // Invoice number INV-yymmddnn: today's date in Dubai time + a 2-digit counter that restarts each day.
+  function invoiceNumber(existingNumbers, prefix = 'INV', now = new Date()) {
+    const d = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Dubai', year: '2-digit', month: '2-digit', day: '2-digit' }).formatToParts(now);
+    const v = (t) => d.find((x) => x.type === t).value;
+    const stem = `${prefix}-${v('year')}${v('month')}${v('day')}`;
+    let n = 0;
+    for (const x of existingNumbers || []) { const m = String(x).match(new RegExp(`^${stem}(\\d{2,})$`)); if (m) n = Math.max(n, +m[1]); }
+    return `${stem}${String(n + 1).padStart(2, '0')}`;
+  }
+
+  return { invoiceNumber, manualTotals, CURRENCIES, rateToBase, crossRate, convert, feeFor, minApplied, effectiveFee, clientCurrency, compareQuotes, invoiceTotals, parseFx, sumIn, round2 };
 });

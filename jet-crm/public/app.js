@@ -733,7 +733,7 @@ async function renderSettings() {
       ${['USD', 'EUR', 'GBP', 'AED', 'SAR', 'CHF'].filter((c) => c !== b.baseCurrency && b.fxRates?.[c]).length ? `<div class="fxgrid">${['USD', 'EUR', 'GBP', 'AED', 'SAR', 'CHF'].filter((c) => c !== b.baseCurrency && b.fxRates?.[c]).map((c) => `<div><span>1 ${c}</span><b>${Number(b.fxRates[c]).toFixed(4)} ${esc(b.baseCurrency)}</b></div>`).join('')}</div>` : ''}
       <label>Manual rates (override live rates; units of ${esc(b.baseCurrency)} per 1 unit)</label><input id="b_fx" placeholder="USD=3.75, EUR=4.05" value="${esc(Object.entries(b.fxOverrides || {}).map(([k, v]) => `${k}=${v}`).join(', '))}">
       <label>FX buffer % (added when converting a quote into the client's currency)</label><input id="b_fxBufferPct" type="number" step="0.1" value="${b.fxBufferPct || 0}">
-      <div class="grid2"><div><label>Invoice prefix</label><input id="b_invoicePrefix" value="${esc(b.invoicePrefix)}"></div><div><label>Next invoice no.</label><input id="b_nextInvoiceNo" type="number" value="${b.nextInvoiceNo}"></div></div>
+      <label>Invoice prefix</label><input id="b_invoicePrefix" value="${esc(b.invoicePrefix)}"><div class="small muted">Invoices are numbered ${esc(b.invoicePrefix || 'INV')}-yymmddnn: the date (Dubai time) plus a 2-digit count for that day, e.g. ${esc(Pricing.invoiceNumber([], b.invoicePrefix || 'INV'))} for today's first invoice.</div>
       <label>Invoice footer / terms</label><textarea id="b_invoiceNotes" style="min-height:70px">${esc(b.invoiceNotes)}</textarea>
       <button class="btn primary block" style="margin-top:12px" id="bsv">Save business details</button>
     </div>
@@ -787,7 +787,7 @@ Alexander Grant
   };
   $('#bsv').onclick = async () => {
     const body = { fxText: $('#b_fx').value, fxAuto: $('#b_fxAuto').checked };
-    ['fxBufferPct', 'name', 'address', 'taxId', 'regNo', 'email', 'phone', 'bankName', 'accountName', 'iban', 'swift', 'feeType', 'feeValue', 'feeMin', 'feeDisplay', 'vatRate', 'vatOn', 'baseCurrency', 'paymentTermsDays', 'invoicePrefix', 'nextInvoiceNo', 'invoiceNotes']
+    ['fxBufferPct', 'name', 'address', 'taxId', 'regNo', 'email', 'phone', 'bankName', 'accountName', 'iban', 'swift', 'feeType', 'feeValue', 'feeMin', 'feeDisplay', 'vatRate', 'vatOn', 'baseCurrency', 'paymentTermsDays', 'invoicePrefix', 'invoiceNotes']
       .forEach((k) => (body[k] = $('#b_' + k).value));
     state = await api('/business', { method: 'PUT', body }); toast('Business details saved');
   };

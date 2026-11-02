@@ -271,9 +271,9 @@ async function api(req, res, url) {
     const body = await readBody(req);
     const prevBase = db.business.baseCurrency;
     const fields = ['name', 'address', 'taxId', 'regNo', 'email', 'phone', 'website', 'bankName', 'accountName', 'iban', 'swift',
-      'baseCurrency', 'fxBufferPct', 'feeType', 'feeValue', 'feeMin', 'feeDisplay', 'vatRate', 'vatOn', 'invoicePrefix', 'nextInvoiceNo', 'paymentTermsDays', 'invoiceNotes', 'quotationPrefix'];
+      'baseCurrency', 'fxBufferPct', 'feeType', 'feeValue', 'feeMin', 'feeDisplay', 'vatRate', 'vatOn', 'invoicePrefix', 'paymentTermsDays', 'invoiceNotes', 'quotationPrefix'];
     Object.assign(db.business, pick(body, fields));
-    for (const k of ['feeValue', 'feeMin', 'vatRate', 'nextInvoiceNo', 'paymentTermsDays', 'fxBufferPct']) db.business[k] = Number(db.business[k]) || 0;
+    for (const k of ['feeValue', 'feeMin', 'vatRate', 'paymentTermsDays', 'fxBufferPct']) db.business[k] = Number(db.business[k]) || 0;
     if (body.fxAuto !== undefined) db.business.fxAuto = Boolean(body.fxAuto);
     if (body.fxText !== undefined) db.business.fxOverrides = Pricing.parseFx(body.fxText);
     db.business.baseCurrency = String(db.business.baseCurrency || 'EUR').toUpperCase();
