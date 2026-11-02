@@ -53,6 +53,7 @@ const ALIASES = {
   'billy bishop': 'CYTZ', 'don mueang': 'VTBD', 'seletar': 'WSSL', 'lanseria': 'FALA', 'bankstown': 'YSBK', 'gimpo': 'RKSS', 'campo de marte': 'SBMT',
   'cannes': 'LFMD', 'cannes mandelieu': 'LFMD', 'la mole': 'LFTZ', 'saint tropez': 'LFTZ', 'st tropez': 'LFTZ', 'treviso': 'LIPH',
   'king khalid': 'OERK', 'king khaled': 'OERK', 'king abdulaziz': 'OEJN',
+  'glasgow': 'EGPF', 'brest': 'LFRB', 'basel': 'LFSB', 'euroairport': 'LFSB', 'delhi': 'VIDP', 'new delhi': 'VIDP', 'malta': 'LMML', 'luqa': 'LMML',
 };
 
 let rows = null;

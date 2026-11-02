@@ -565,25 +565,30 @@ async function rfqSheet(r) {
   });
 }
 
-let contactType = 'supplier', contactQ = '';
+let contactType = 'supplier', contactQ = '', contactTag = '';
+const TAG_FILTERS = ['Family office', 'Umrah & Hajj agency', 'Concierge / agency partner', 'Luxury travel agent'];
 async function renderContacts() {
   const all = await api('/contacts');
   const list = all.filter((c) => (contactType === 'all' || (contactType === 'supplier' ? c.type !== 'client' : c.type === 'client')))
-    .filter((c) => !contactQ || `${c.name} ${c.company} ${c.email} ${c.region}`.toLowerCase().includes(contactQ.toLowerCase()))
+    .filter((c) => contactType !== 'client' || !contactTag || (c.tags || '').includes(contactTag))
+    .filter((c) => !contactQ || `${c.name} ${c.company} ${c.email} ${c.region} ${c.country || ''} ${c.tags || ''} ${c.fleet || ''} ${c.bases || ''}`.toLowerCase().includes(contactQ.toLowerCase()))
     .sort((a, b) => (a.company || a.name || '').localeCompare(b.company || b.name || ''));
-  const noBase = all.filter((c) => c.type === 'operator' && !(c.global) && !c.bases && !c.region).length;
+  const noBase = all.filter((c) => c.type === 'operator' && c.email && !(c.global) && !c.bases && !c.region).length;
   view.innerHTML = `<div class="row" style="justify-content:flex-end"><button class="btn sm" id="imp">Import contacts</button></div>
     ${noBase ? `<div class="banner">${noBase} operator${noBase === 1 ? ' has' : 's have'} no base airport, so ${noBase === 1 ? 'it' : 'they'} won't receive routed RFQs. Tap one to add its base (e.g. EGLF).</div>` : ''}
-    <input placeholder="Search name, company, region…" id="q" value="${esc(contactQ)}">
+    <input placeholder="Search name, company, country, aircraft…" id="q" value="${esc(contactQ)}">
     <div class="chips" style="margin-top:10px">${[['supplier', 'Brokers & operators'], ['client', 'Clients'], ['all', 'All']].map(([k, v]) => `<button class="chip ${k === contactType ? 'on' : ''}" data-t="${k}">${v}</button>`).join('')}</div>
+    ${contactType === 'client' ? `<div class="chips">${[['', 'All clients'], ...TAG_FILTERS.map((t) => [t, t])].map(([k, v]) => `<button class="chip ${k === contactTag ? 'on' : ''}" data-tag="${esc(k)}">${esc(v)}</button>`).join('')}</div>` : ''}
+    <div class="small muted" style="margin:4px 0 6px">${list.length} contact${list.length === 1 ? '' : 's'}${list.filter((c) => !c.email).length ? ` · ${list.filter((c) => !c.email).length} without email` : ''}</div>
     ${list.map((c) => `<div class="list-item"><div class="avatar">${initials(c.company || c.name)}</div>
       <div class="grow" data-edit="${c.id}"><b>${esc(c.company || c.name)}</b>${c.demo ? ' <span class="badge">demo</span>' : ''}${c.source === 'web' ? ' <span class="badge web">found online</span>' : ''}
-        <div class="small muted">${esc(c.name !== c.company ? c.name + ' · ' : '')}${TYPES[c.type] || c.type}${c.type !== 'client' ? ` · ${(c.global ?? c.type === 'broker') ? 'worldwide' : c.bases ? 'base ' + esc(c.bases) : '<span style="color:var(--amber)">no base airport</span>'}` : ''}</div><div class="small muted">${esc(c.email)}</div>${c.type === 'operator' ? `<div class="small muted">${c.fleet ? 'Fleet: ' + esc(c.fleet) : '<span style="color:var(--amber)">no fleet on file</span>'}</div>` : ''}</div>
-      ${c.type !== 'client' ? `<label class="switch" title="Include in automatic RFQs"><input type="checkbox" data-rfq="${c.id}" ${c.rfqEnabled !== false ? 'checked' : ''}><span></span></label>` : ''}</div>`).join('') || '<div class="empty">No contacts.</div>'}
+        <div class="small muted">${esc(c.name !== c.company ? c.name + ' · ' : '')}${TYPES[c.type] || c.type}${c.type !== 'client' ? ` · ${(c.global ?? c.type === 'broker') ? 'worldwide' : c.bases ? 'base ' + esc(c.bases) : '<span style="color:var(--amber)">no base airport</span>'}` : ''}</div>${c.type === 'client' && (c.tags || c.region) ? `<div class="small muted">${esc([c.tags, c.region].filter(Boolean).join(' · '))}</div>` : ''}<div class="small muted">${c.email ? esc(c.email) : `<i>no email${c.phone ? ' · ' + esc(c.phone) : ''}</i>`}</div>${c.type === 'operator' ? `<div class="small muted">${c.fleet ? 'Fleet: ' + esc(c.fleet) : '<span style="color:var(--amber)">no fleet on file</span>'}</div>` : ''}</div>
+      ${c.type !== 'client' ? `<label class="switch" title="Include in automatic RFQs"><input type="checkbox" data-rfq="${c.id}" ${c.rfqEnabled !== false && c.email ? 'checked' : ''} ${c.email ? '' : 'disabled title="Add an email to send RFQs"'}><span></span></label>` : ''}</div>`).join('') || '<div class="empty">No contacts.</div>'}
     <p class="small muted">Toggle = can receive RFQs. Operators get RFQs for trips departing within ${state.settings.routing.radiusKm} km of their base; worldwide brokers get every RFQ.</p>
     <button class="fab" id="add" aria-label="Add contact"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>`;
   $('#q').oninput = (e) => { contactQ = e.target.value; clearTimeout(renderContacts.t); renderContacts.t = setTimeout(async () => { await renderContacts(); const q = $('#q'); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }, 250); };
   view.querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => { contactType = b.dataset.t; renderContacts(); }));
+  view.querySelectorAll('[data-tag]').forEach((b) => (b.onclick = () => { contactTag = b.dataset.tag; renderContacts(); }));
   view.querySelectorAll('[data-rfq]').forEach((i) => (i.onchange = () => api(`/contacts/${i.dataset.rfq}`, { method: 'PATCH', body: { rfqEnabled: i.checked } })));
   view.querySelectorAll('[data-edit]').forEach((el) => (el.onclick = () => contactSheet(all.find((c) => c.id === el.dataset.edit))));
   $('#add').onclick = () => contactSheet();
@@ -602,6 +607,8 @@ function importSheet() {
     <input type="file" id="imp_vcf" accept=".vcf,text/vcard,text/x-vcard" multiple hidden>
     <label class="btn import-opt" for="imp_csv" style="cursor:pointer"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 10h16M4 15h16M10 5v14"/></svg><span><b>Import a spreadsheet (.csv)</b><br><span class="small muted">From Outlook, Excel or another CRM. Columns: name, email, company, phone, type, base, worldwide, fleet.</span></span></label>
     <input type="file" id="imp_csv" accept=".csv,text/csv" hidden>
+    <label class="btn import-opt" for="imp_json" style="cursor:pointer"><svg viewBox="0 0 24 24"><path d="M8 4c-2 0-2 2-2 4s-1 4-2 4c1 0 2 2 2 4s0 4 2 4M16 4c2 0 2 2 2 4s1 4 2 4c-1 0-2 2-2 4s0 4-2 4"/></svg><span><b>Import a contact list (.json)</b><br><span class="small muted">A prepared list, such as your MENA prospect list. Contacts without email are kept too.</span></span></label>
+    <input type="file" id="imp_json" accept=".json,application/json" hidden>
     <details class="rfq-item"><summary><span class="grow"><b>How to get a .vcf from your iPhone</b></span><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="mail small">
       <p><b>A few contacts:</b> open Contacts, open a contact, tap <b>Share Contact</b> → <b>Save to Files</b>. Repeat, or select several in a list (two-finger drag) and share them together.</p>
       <p><b>All contacts:</b> on a computer go to icloud.com/contacts, select all, then <b>⚙ → Export vCard</b>. Send the file to yourself and open it here.</p>
@@ -617,6 +624,18 @@ function importSheet() {
       for (const f of files) all = all.concat(VCard.parse(await f.text()));
       if (!all.length) return toast('No contacts found in that file');
       reviewImport(all, files.length === 1 ? files[0].name : `${files.length} files`);
+    };
+    $('#imp_json').onchange = async (e) => {
+      const f = e.target.files[0]; let items;
+      try { items = JSON.parse(await f.text()); } catch { return toast('That file isn\'t a contact list'); }
+      if (!Array.isArray(items)) return toast('That file isn\'t a contact list');
+      const label = /mena/i.test(f.name) ? 'Private Aviation Prospect List — MENA' : f.name.replace(/\.json$/i, '');
+      const ops = items.filter((x) => x.type && x.type !== 'client').length;
+      sheet(`<h2>Import ${items.length} contacts</h2><p class="small">${ops} operators/brokers and ${items.length - ops} clients from ${esc(f.name)}. Existing contacts are matched by email or company and only missing details are filled in.</p>
+        <p class="small muted">Operators and brokers with an email are switched on for RFQs, so they will receive routed requests once Outlook is connected. You can switch any of them off in Contacts.</p>
+        <button class="btn primary block" id="go">Import</button>`, () => {
+        $('#go').onclick = async () => { const r = await api('/contacts/list', { method: 'POST', body: { items, label } }); closeSheet(); toast(`${r.added} added, ${r.updated} updated`); renderContacts(); };
+      });
     };
     $('#imp_csv').onchange = async (e) => {
       const csv = await e.target.files[0].text();
@@ -654,6 +673,8 @@ function contactSheet(c = {}) {
     <label>Region / city</label><input id="rg" value="${esc(c.region)}">
     <div class="row between" style="margin-top:12px"><div class="grow"><b>Covers worldwide</b><div class="small muted">Gets every RFQ regardless of departure (typical for brokers).</div></div><label class="switch"><input type="checkbox" id="gl" ${(c.global ?? (c.type || 'operator') === 'broker') ? 'checked' : ''}><span></span></label></div>
     <label>Fleet (aircraft types, e.g. Citation XLS+, Challenger 350)</label><input id="f" value="${esc(c.fleet)}">
+    ${c.tags || c.notes || c.list ? `<label>About</label><div class="email-src small">${c.tags ? `<b>${esc(c.tags)}</b><br>` : ''}${esc(c.notes || '')}${c.baseEstimated ? '<br><i>Base airport estimated from the country; check it.</i>' : ''}${c.list ? `<br><span class="muted">From ${esc(c.list)}${c.sourceUrl ? ` · <a href="${esc(c.sourceUrl)}" target="_blank" rel="noopener"><u>source</u></a>` : ''}</span>` : ''}</div>` : ''}
+    ${c.website ? `<label>Website</label><a class="small" href="https://${esc(c.website.replace(/^https?:\/\//, ''))}" target="_blank" rel="noopener"><u>${esc(c.website)}</u></a>` : ''}
     <label>Preferred currency (clients)</label><select id="pc"><option value="">Use base currency</option>${curOptions(c.preferredCurrency)}</select>
     ${c.source === 'web' ? `<p class="small muted">Found online for ${esc(c.foundFor || '')}. Source: <a href="${esc(c.sourceUrl)}" target="_blank" rel="noopener"><u>${esc(c.sourceUrl)}</u></a></p>` : ''}
     <button class="btn primary block" style="margin-top:14px" id="sv">Save</button>

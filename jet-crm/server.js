@@ -8,6 +8,7 @@ const graph = require('./lib/graph');
 const engine = require('./lib/engine');
 const { aiEnabled } = require('./lib/parser');
 const seed = require('./lib/seed');
+const lists = require('./lib/lists');
 const invoices = require('./lib/invoice');
 const Pricing = require('./public/shared/pricing');
 const routing = require('./lib/routing');
@@ -70,7 +71,7 @@ function parseCsv(text) {
   return data.map((r) => Object.fromEntries(keys.map((k, i) => [k, (r[i] || '').trim()])));
 }
 
-const CONTACT_FIELDS = ['name', 'email', 'phone', 'company', 'type', 'rfqEnabled', 'region', 'fleet', 'notes', 'tags', 'bases', 'global', 'website', 'preferredCurrency'];
+const CONTACT_FIELDS = ['name', 'email', 'phone', 'company', 'type', 'rfqEnabled', 'region', 'fleet', 'notes', 'tags', 'bases', 'global', 'website', 'preferredCurrency', 'country'];
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
 
 const withLegInfo = (r) => ({ ...r, legInfo: r.legs.map((l) => ({ from: geo.endpoint(l.from, l.fromCode), to: geo.endpoint(l.to, l.toCode) })) });
@@ -207,6 +208,11 @@ async function api(req, res, url) {
   // contacts
   if (a === 'contacts') {
     if (!b && M === 'GET') return send(res, 200, db.contacts);
+    if (b === 'list' && M === 'POST') {
+      const { items, label } = await readBody(req);
+      if (!Array.isArray(items) || !items.length) return send(res, 400, { error: 'That file has no contacts in it.' });
+      return send(res, 200, lists.importItems(items.slice(0, 5000), String(label || 'Imported list').slice(0, 120)));
+    }
     if (b === 'bulk' && M === 'POST') {
       const { contacts = [], type = 'client' } = await readBody(req);
       let added = 0, updated = 0, skipped = 0;
@@ -234,6 +240,7 @@ async function api(req, res, url) {
           type: ['broker', 'operator', 'client'].includes((row.type || '').toLowerCase()) ? row.type.toLowerCase() : (type || 'operator'),
           region: row.region || row.city || row.country || '', bases: row.bases || row.base || row.icao || row.airport || '',
           fleet: row.fleet || row.aircraft || '', email,
+          tags: row.tags || row.category || '', notes: row.notes || '', website: row.website || '', country: row.country || '',
           ...(row.worldwide || row.global ? { global: /^(y|yes|true|1)$/i.test(row.worldwide || row.global) } : {}),
         };
         const ex = db.contacts.find((x) => x.email === email);
@@ -246,8 +253,9 @@ async function api(req, res, url) {
     if (!b && M === 'POST') {
       const body = pick(await readBody(req), CONTACT_FIELDS);
       body.email = (body.email || '').toLowerCase().trim();
-      if (!/@/.test(body.email)) return send(res, 400, { error: 'Valid email required' });
-      if (db.contacts.some((x) => x.email === body.email)) return send(res, 409, { error: 'Contact already exists' });
+      if (body.email && !/@/.test(body.email)) return send(res, 400, { error: 'Enter a valid email address, or leave it empty' });
+      if (!body.email && !body.name && !body.company) return send(res, 400, { error: 'Add a name, company or email' });
+      if (body.email && db.contacts.some((x) => x.email === body.email)) return send(res, 409, { error: 'Contact already exists' });
       const con = { id: store.id('con'), type: 'operator', rfqEnabled: true, createdAt: new Date().toISOString(), ...body };
       db.contacts.push(con);
       store.save();
@@ -384,6 +392,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 seed.ensure();
+lists.ensure();
 server.listen(PORT, () => {
   console.log(`SkyDesk CRM on http://localhost:${PORT}  (Outlook: ${engine.live() ? 'connected' : graph.configured() ? 'not connected' : 'demo mode'}, AI parsing: ${aiEnabled() ? 'Claude' : 'rules'})`);
   engine.start();
