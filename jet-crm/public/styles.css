@@ -253,3 +253,4 @@ input[type=radio], input[type=checkbox] { accent-color: #000; }
 .import-opt svg { flex: none; }
 .pick-row { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); color: #000; margin: 0; }
 .pick-row.off { opacity: .5; }
+.trip-card .trip-ac { margin-top: 4px; font-size: 14px; color: var(--muted); }

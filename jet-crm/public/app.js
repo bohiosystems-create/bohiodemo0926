@@ -122,12 +122,10 @@ async function renderRequests() {
     ${shown.length ? shown.map((r) => {
       const best = Pricing.compareQuotes(r, state.business).best;
       const tbc = (r.legInfo || []).some((x) => x.from.status !== 'airport' || x.to.status !== 'airport');
-      return `<a class="card" href="#/req/${r.id}">
-        <div class="row between"><span class="small muted">${esc(r.ref)} · ${ago(r.createdAt)}</span><span class="badge ${r.status}">${STATUS[r.status]}</span></div>
-        <div class="route" style="margin-top:6px">${routeHtml(r)}</div>
-        <div class="meta"><span>${fmtDate(r.legs[0]?.date)}</span><span>${r.pax ?? '?'} pax</span>${r.category ? `<span>${esc(r.category)}</span>` : ''}<span>${esc(r.client?.name || r.client?.email || '')}</span></div>
-        ${offerState(r) ? `<div class="offer-line ${offerState(r).kind}">${esc(offerState(r).text)}</div>` : ''}
-        <div class="meta"><span>${r.rfqCount || 0} RFQ${r.rfqCount === 1 ? '' : 's'} sent</span><span>${r.quotes.length} quote${r.quotes.length === 1 ? '' : 's'}</span>${best ? `<span style="color:var(--green)">Best ${money(best.clientPriceTarget, Pricing.clientCurrency(r, state.business))} to client</span>` : ''}${tbc ? '<span class="tbc">airport to confirm</span>' : ''}</div>
+      return `<a class="card trip-card" href="#/req/${r.id}">
+        <div class="small muted">${esc(r.ref)}</div>
+        <div class="route" style="margin-top:4px">${routeHtml(r)}</div>
+        <div class="trip-ac">${esc(r.category || 'Aircraft type to confirm')}</div>
       </a>`;
     }).join('') : `<div class="empty">No requests here yet.<br><span class="small">New charter enquiries arriving in your inbox appear automatically.</span></div>`}
     <button class="fab" id="newReq" aria-label="New request"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>`;
