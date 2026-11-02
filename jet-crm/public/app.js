@@ -109,11 +109,11 @@ async function renderRequests() {
   const reqs = await api('/requests');
   const open = reqs.filter((r) => !['won', 'lost'].includes(r.status));
   const filters = { open: 'Open', all: 'All', ...STATUS };
-  const shown = [...open, ...reqs.filter((r) => !open.includes(r))]; // open trips first, then won/lost
+  // Trips waiting on you (offer to approve, client acceptance to confirm, unclear reply) first, then other open trips, then won/lost.
+  const needsYou = (r) => r.proposal?.status === 'pending' || r.proposal?.status === 'accepted' || !!r.proposal?.needsReview;
+  const shown = [...open.filter(needsYou), ...open.filter((r) => !needsYou(r)), ...reqs.filter((r) => !open.includes(r))];
   view.innerHTML = `
     <div class="hero" aria-hidden="true"></div>
-    ${(() => { const a = reqs.filter((r) => r.proposal?.status === 'accepted'); return a.length ? `<a class="card approve-cta" href="#/req/${a[0].id}"><b>${a.length} client${a.length === 1 ? '' : 's'} accepted a quotation</b><span class="small muted">Confirm to award the flight and send the invoice.</span></a>` : ''; })()}
-    ${(() => { const p = reqs.filter((r) => r.proposal?.status === 'pending'); return p.length ? `<a class="card approve-cta" href="#/req/${p[0].id}"><b>${p.length} offer${p.length === 1 ? '' : 's'} waiting for your approval</b><span class="small muted">The agent picked the best quote${p.length === 1 ? '' : 's'}. Review the price and fee before it goes to the client.</span></a>` : ''; })()}
     <div class="stats">
       <div class="stat"><b>${open.length}</b><span>Open requests</span></div>
       <div class="stat"><b>${reqs.reduce((n, r) => n + r.quotes.length, 0)}</b><span>Quotes in</span></div>
