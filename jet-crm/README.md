@@ -52,7 +52,7 @@ Once Outlook is connected, demo suppliers are never emailed. Import your real br
 
 The 60-second poll needs a long-running process, so use an always-on host rather than serverless functions:
 
-- **Render**: `render.yaml` is included (web service + 1 GB persistent disk at `/data`).
+- **Render**: `render.yaml` (at the repository root) sets up the web service from the `jet-crm` folder with a 1 GB persistent disk at `/data`. In Render choose **New → Blueprint**, pick this repository and branch, and fill in the secret values it asks for.
 - **Docker / any VPS / Fly.io / Railway**: `docker build -t skydesk . && docker run -p 3000:3000 -v skydesk:/data --env-file .env skydesk`
 
 Data is stored in `DATA_DIR/db.json`, including the Outlook refresh token. Keep that disk private and back it up.

@@ -2,6 +2,7 @@ services:
   - type: web
     name: skydesk-crm
     runtime: node
+    rootDir: jet-crm         # the app lives in this folder of the repository
     plan: starter            # needs an always-on instance for the 60-second inbox poll
     buildCommand: npm ci --omit=dev
     startCommand: node server.js
