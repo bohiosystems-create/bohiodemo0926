@@ -170,7 +170,7 @@ async function approveProposal(req, { quoteId, feePct, subject, body }) {
   const draft = Proposal.draftEmail(req, row, db.business, { senderName: db.settings.senderName, routeText: legText(req) });
   const quo = invoices.createQuotation(req, quoteId, { validityHours: Number(db.settings.quoteValidityHours) || 48 });
   const validTxt = `${quo.validUntil.slice(0, 16).replace('T', ' ')} UTC`;
-  const label = `Quotation ${quo.number} (valid until ${validTxt}) is attached. To book, simply reply "Confirmed" to this email and we will send your invoice straight away.`;
+  const label = `Quotation ${quo.number} (valid until ${validTxt}) is attached. To book, simply reply "Confirmed" to this email and we will send your invoice.`;
   let text = body || draft.body;
   text = text.replace('This offer is subject to availability at the time of confirmation. To book, simply reply to this email and we will send the contract and invoice.', `This offer is subject to availability at the time of confirmation. ${label}`);
   if (!text.includes(quo.number)) text += `\n\n${label}`;
@@ -192,21 +192,33 @@ async function approveProposal(req, { quoteId, feePct, subject, body }) {
   return req;
 }
 // The client accepted the quotation (or you marked it awarded): issue the invoice from the quotation and email it.
+// The client accepted by email: record it and wait for the broker to confirm before invoicing.
+function markAccepted(req, { source }) {
+  const db = store.load();
+  const p = req.proposal;
+  const quo = db.quotations.find((x) => x.id === p.quotationId);
+  if (quo) quo.status = 'accepted';
+  p.status = 'accepted'; p.acceptedAt = new Date().toISOString(); p.acceptSource = source; delete p.needsReview;
+  store.log('award', `${req.ref}: client accepted quotation ${p.quotationNumber}. Confirm to award the flight and send invoice.`, { requestId: req.id });
+  store.save();
+  notify({ type: 'accepted', requestId: req.id });
+}
+
+// Broker confirms: flight awarded, invoice issued from the quotation's locked amounts and emailed.
 async function award(req, { source }) {
   const db = store.load();
   const p = req.proposal;
-  if (!p || p.status !== 'sent' || !p.quotationId) throw Object.assign(new Error('Send a quotation first; the invoice is issued from it.'), { status: 400 });
+  if (!p || !['sent', 'accepted'].includes(p.status) || !p.quotationId) throw Object.assign(new Error('Send a quotation first; the invoice is issued from it.'), { status: 400 });
   const quo = db.quotations.find((x) => x.id === p.quotationId);
   quo.status = 'accepted';
+  if (p.status === 'accepted' && p.acceptSource) source = `${p.acceptSource}, confirmed by you`;
   p.status = 'awarded'; p.awardedAt = new Date().toISOString(); p.awardSource = source;
   req.status = 'won';
   store.log('award', `${req.ref}: flight awarded (${source}), quotation ${quo.number} accepted`, { requestId: req.id });
   const inv = invoices.createFromQuotation(req, quo);
   p.invoiceId = inv.id; p.invoiceNumber = inv.number;
-  if (db.settings.autoInvoiceOnAward) {
-    try { await invoices.sendInvoice(inv, { live: live(), graph, senderName: db.settings.senderName }); p.invoiceSentAt = inv.sentAt; }
-    catch (e) { p.invoiceError = e.message; store.log('invoice', `Invoice ${inv.number} issued but not sent: ${e.message}`, { requestId: req.id }); }
-  }
+  try { await invoices.sendInvoice(inv, { live: live(), graph, senderName: db.settings.senderName }); p.invoiceSentAt = inv.sentAt; }
+  catch (e) { p.invoiceError = e.message; store.log('invoice', `Invoice ${inv.number} issued but not sent: ${e.message}`, { requestId: req.id }); }
   store.save();
   notify({ type: 'award', requestId: req.id });
   return req;
@@ -314,7 +326,7 @@ async function handleEmail(email) {
       const c = await classifyReply(email);
       msg.decision = c.decision; msg.decisionReason = c.reason;
       const expired = req.proposal.validUntil && Date.now() > Date.parse(req.proposal.validUntil);
-      if (c.decision === 'accept' && !expired) await award(req, { source: 'client confirmed by email' });
+      if (c.decision === 'accept' && !expired) markAccepted(req, { source: 'client confirmed by email' });
       else if (c.decision === 'accept' && expired) { req.proposal.needsReview = 'Client confirmed after the quotation expired. Check the price with the operator, then mark it awarded.'; store.log('award', `${req.ref}: client confirmed after quotation ${req.proposal.quotationNumber} expired. Waiting for you.`, { requestId: req.id }); }
       else if (c.decision === 'decline') decline(req, { source: 'client declined by email' });
       else if (c.decision === 'unclear') { req.proposal.needsReview = `Client replied but it's not a clear yes: ${c.reason}. Read the reply, then mark it awarded or not.`; }
@@ -441,4 +453,4 @@ function start() {
   setInterval(() => drainOutbox().catch(() => {}), 10000);
 }
 
-module.exports = { start, poll, queueRfqs, autoRoute, runFollowUps, ackText, runProposals, approveProposal, proposeNow, buildProposal, award, decline, drainOutbox, injectDemoEmail, routeLabel, live, onEvent: (fn) => (listeners.add(fn), () => listeners.delete(fn)) };
+module.exports = { start, poll, queueRfqs, autoRoute, runFollowUps, ackText, runProposals, approveProposal, proposeNow, buildProposal, award, decline, markAccepted, drainOutbox, injectDemoEmail, routeLabel, live, onEvent: (fn) => (listeners.add(fn), () => listeners.delete(fn)) };

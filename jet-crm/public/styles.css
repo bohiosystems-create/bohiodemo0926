@@ -241,3 +241,5 @@ a[style*="color"], span[style*="color"], div[style*="color"], small[style*="colo
 .ap-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); color: #000; margin: 0; }
 .ap-row.dq { opacity: .55; }
 input[type=radio], input[type=checkbox] { accent-color: #000; }
+
+.accepted-box { margin-top: 10px; padding: 12px; border: 2px solid #000; border-radius: 12px; }

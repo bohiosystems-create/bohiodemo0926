@@ -298,7 +298,6 @@ async function api(req, res, url) {
     const body = await readBody(req);
     Object.assign(db.settings, pick(body, ['autoSendRfq', 'senderName', 'autoAck']));
     if (body.quoteValidityHours !== undefined) db.settings.quoteValidityHours = Math.max(1, Math.min(720, Number(body.quoteValidityHours) || 48));
-    if (body.autoInvoiceOnAward !== undefined) db.settings.autoInvoiceOnAward = Boolean(body.autoInvoiceOnAward);
     if (body.quoteWindowMinutes !== undefined) db.settings.quoteWindowMinutes = Math.max(0, Math.min(240, Number(body.quoteWindowMinutes) || 0));
     if (typeof body.ackTemplate === 'string' && body.ackTemplate.trim()) db.settings.ackTemplate = body.ackTemplate;
     if (body.followUp) db.settings.followUp = { enabled: Boolean(body.followUp.enabled), everyMinutes: Math.max(5, Number(body.followUp.everyMinutes) || 15), maxPerOperator: Math.max(1, Math.min(10, Number(body.followUp.maxPerOperator) || 3)) };

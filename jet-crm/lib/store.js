@@ -50,7 +50,6 @@ Kind regards,
     followUp: { enabled: true, everyMinutes: 15, maxPerOperator: 3 },
     quoteWindowMinutes: 30,  // after the first quote, wait this long for more before proposing
     quoteValidityHours: 48,  // how long a quotation sent to a client is valid
-    autoInvoiceOnAward: true, // when the client accepts a quotation, issue and email the invoice automatically
   },
   discoveries: {},
   business: {
@@ -86,7 +85,6 @@ function load() {
     db.settings.followUp = { ...empty().settings.followUp, ...db.settings.followUp };
     if (db.settings.autoAck === undefined) db.settings.autoAck = true;
     if (db.settings.quoteValidityHours === undefined) db.settings.quoteValidityHours = 48;
-    if (db.settings.autoInvoiceOnAward === undefined) db.settings.autoInvoiceOnAward = true;
     if (!db.business.quotationPrefix) { db.business.quotationPrefix = 'QUO'; db.business.nextQuotationNo = 1; }
     db.quotations = db.quotations || [];
     if (!db.settings.ackTemplate) db.settings.ackTemplate = empty().settings.ackTemplate;
