@@ -243,3 +243,13 @@ a[style*="color"], span[style*="color"], div[style*="color"], small[style*="colo
 input[type=radio], input[type=checkbox] { accent-color: #000; }
 
 .accepted-box { margin-top: 10px; padding: 12px; border: 2px solid #000; border-radius: 12px; }
+
+/* ---- launch splash: the Bohio Air Charter poster ---- */
+#splash { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: #ebd4c2; transition: opacity .5s ease; cursor: pointer; }
+#splash img { width: 100%; height: 100%; object-fit: contain; display: block; }
+#splash.out { opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { #splash { transition: none; } }
+.import-opt { width: 100%; text-align: left; display: flex; gap: 12px; align-items: center; padding: 14px; margin-bottom: 10px; }
+.import-opt svg { flex: none; }
+.pick-row { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); color: #000; margin: 0; }
+.pick-row.off { opacity: .5; }

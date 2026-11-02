@@ -207,6 +207,21 @@ async function api(req, res, url) {
   // contacts
   if (a === 'contacts') {
     if (!b && M === 'GET') return send(res, 200, db.contacts);
+    if (b === 'bulk' && M === 'POST') {
+      const { contacts = [], type = 'client' } = await readBody(req);
+      let added = 0, updated = 0, skipped = 0;
+      for (const x of contacts.slice(0, 2000)) {
+        const email = String(x.email || '').toLowerCase().trim();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { skipped++; continue; }
+        const ex = db.contacts.find((c) => c.email === email);
+        const data = { name: String(x.name || email).slice(0, 120), phone: String(x.phone || '').slice(0, 40), company: String(x.company || '').slice(0, 120), notes: String(x.notes || '').slice(0, 1000) };
+        if (ex) { for (const [k, v] of Object.entries(data)) if (v && !ex[k]) ex[k] = v; updated++; }
+        else { const t = ['client', 'operator', 'broker'].includes(type) ? type : 'client'; db.contacts.push({ id: store.id('con'), type: t, rfqEnabled: t !== 'client', source: 'phone', createdAt: new Date().toISOString(), email, ...data }); added++; }
+      }
+      store.log('contacts', `Imported from phone contacts: ${added} added, ${updated} updated${skipped ? `, ${skipped} skipped (no email)` : ''}`);
+      store.save();
+      return send(res, 200, { added, updated, skipped });
+    }
     if (b === 'import' && M === 'POST') {
       const { csv, type } = await readBody(req);
       let added = 0, updated = 0;

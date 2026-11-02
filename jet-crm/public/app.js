@@ -555,7 +555,7 @@ async function renderContacts() {
     .filter((c) => !contactQ || `${c.name} ${c.company} ${c.email} ${c.region}`.toLowerCase().includes(contactQ.toLowerCase()))
     .sort((a, b) => (a.company || a.name || '').localeCompare(b.company || b.name || ''));
   const noBase = all.filter((c) => c.type === 'operator' && !(c.global) && !c.bases && !c.region).length;
-  view.innerHTML = `<div class="row" style="justify-content:flex-end"><button class="btn sm" id="imp">Import CSV</button></div>
+  view.innerHTML = `<div class="row" style="justify-content:flex-end"><button class="btn sm" id="imp">Import contacts</button></div>
     ${noBase ? `<div class="banner">${noBase} operator${noBase === 1 ? ' has' : 's have'} no base airport, so ${noBase === 1 ? 'it' : 'they'} won't receive routed RFQs. Tap one to add its base (e.g. EGLF).</div>` : ''}
     <input placeholder="Search name, company, region…" id="q" value="${esc(contactQ)}">
     <div class="chips" style="margin-top:10px">${[['supplier', 'Brokers & operators'], ['client', 'Clients'], ['all', 'All']].map(([k, v]) => `<button class="chip ${k === contactType ? 'on' : ''}" data-t="${k}">${v}</button>`).join('')}</div>
@@ -570,16 +570,66 @@ async function renderContacts() {
   view.querySelectorAll('[data-rfq]').forEach((i) => (i.onchange = () => api(`/contacts/${i.dataset.rfq}`, { method: 'PATCH', body: { rfqEnabled: i.checked } })));
   view.querySelectorAll('[data-edit]').forEach((el) => (el.onclick = () => contactSheet(all.find((c) => c.id === el.dataset.edit))));
   $('#add').onclick = () => contactSheet();
-  $('#imp').onclick = () => sheet(`<h2>Import contacts</h2><p class="small muted">Paste CSV, or pick a file exported from Outlook, Excel or your old CRM. Columns recognised: name, email, company, phone, type (broker/operator/client), base (airport codes like EGLF), worldwide (yes/no), region, fleet.</p>
-    <input type="file" accept=".csv,text/csv" id="file"><textarea id="csv" placeholder="name,email,company,type,base,worldwide&#10;Jane Doe,charter@opair.com,Op Air,operator,LSGG,no"></textarea>
-    <label>Default type when no "type" column</label><select id="dt"><option value="operator">Operator</option><option value="broker">Broker</option><option value="client">Client</option></select>
-    <button class="btn primary block" style="margin-top:12px" id="go">Import</button>`, () => {
-    $('#file').onchange = async (e) => { $('#csv').value = await e.target.files[0].text(); };
-    $('#go').onclick = async () => { const r = await api('/contacts/import', { method: 'POST', body: { csv: $('#csv').value, type: $('#dt').value } }); closeSheet(); toast(`${r.added} added, ${r.updated} updated`); renderContacts(); };
+  $('#imp').onclick = importSheet;
+}
+const hasPicker = () => 'contacts' in navigator && 'ContactsManager' in window;
+async function pickFromPhone(multiple) {
+  const list = await navigator.contacts.select(['name', 'email', 'tel'], { multiple });
+  return VCard.fromPicker(list);
+}
+
+function importSheet() {
+  sheet(`<h2>Import contacts</h2>
+    <button class="btn import-opt" id="imp_phone"><svg viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg><span><b>Choose from iPhone contacts</b><br><span class="small muted">${hasPicker() ? 'Opens your contact list so you can tick who to add.' : 'Needs Safari\'s Contact Picker setting. Tap for how to turn it on.'}</span></span></button>
+    <label class="btn import-opt" for="imp_vcf" style="cursor:pointer"><svg viewBox="0 0 24 24"><path d="M6 2.5h8l4 4V21.5H6z"/><circle cx="12" cy="11" r="2.5"/><path d="M8.5 17.5c.6-1.8 1.9-2.7 3.5-2.7s2.9.9 3.5 2.7"/></svg><span><b>Import a contacts file (.vcf)</b><br><span class="small muted">A vCard exported from iPhone or iCloud. Works on every phone.</span></span></label>
+    <input type="file" id="imp_vcf" accept=".vcf,text/vcard,text/x-vcard" multiple hidden>
+    <label class="btn import-opt" for="imp_csv" style="cursor:pointer"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 10h16M4 15h16M10 5v14"/></svg><span><b>Import a spreadsheet (.csv)</b><br><span class="small muted">From Outlook, Excel or another CRM. Columns: name, email, company, phone, type, base, worldwide, fleet.</span></span></label>
+    <input type="file" id="imp_csv" accept=".csv,text/csv" hidden>
+    <details class="rfq-item"><summary><span class="grow"><b>How to get a .vcf from your iPhone</b></span><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="mail small">
+      <p><b>A few contacts:</b> open Contacts, open a contact, tap <b>Share Contact</b> → <b>Save to Files</b>. Repeat, or select several in a list (two-finger drag) and share them together.</p>
+      <p><b>All contacts:</b> on a computer go to icloud.com/contacts, select all, then <b>⚙ → Export vCard</b>. Send the file to yourself and open it here.</p>
+      <p>Only contacts with an email address are added. Nothing on your phone is changed.</p></div></details>`, (root) => {
+    $('#imp_phone').onclick = async () => {
+      if (!hasPicker()) return sheet(`<h2>Turn on the Contact Picker</h2><p class="small">Safari on iPhone can open your contacts for a web app once this setting is on:</p>
+        <ol class="small"><li>Open the iPhone <b>Settings</b> app.</li><li>Go to <b>Apps → Safari → Advanced → Feature Flags</b> (on older iOS: Safari → Advanced → Experimental Features).</li><li>Switch on <b>Contact Picker API</b>.</li><li>Come back here and tap <b>Choose from iPhone contacts</b> again.</li></ol>
+        <p class="small muted">Or use the .vcf file option, which needs no setting.</p><button class="btn block" id="bk">Back</button>`, () => { $('#bk').onclick = importSheet; });
+      try { reviewImport(await pickFromPhone(true), 'iPhone contacts'); } catch (e) { if (e.name !== 'AbortError' && e.name !== 'InvalidStateError') toast(e.message); }
+    };
+    $('#imp_vcf').onchange = async (e) => {
+      const files = [...e.target.files]; let all = [];
+      for (const f of files) all = all.concat(VCard.parse(await f.text()));
+      if (!all.length) return toast('No contacts found in that file');
+      reviewImport(all, files.length === 1 ? files[0].name : `${files.length} files`);
+    };
+    $('#imp_csv').onchange = async (e) => {
+      const csv = await e.target.files[0].text();
+      sheet(`<h2>Import spreadsheet</h2><label>Type for rows without a "type" column</label><select id="dt"><option value="operator">Operator</option><option value="broker">Broker</option><option value="client">Client</option></select>
+        <button class="btn primary block" style="margin-top:12px" id="go">Import</button>`, () => {
+        $('#go').onclick = async () => { const r = await api('/contacts/import', { method: 'POST', body: { csv, type: $('#dt').value } }); closeSheet(); toast(`${r.added} added, ${r.updated} updated`); renderContacts(); };
+      });
+    };
   });
 }
+
+// Shows what was found, lets you untick people and choose whether they are clients, operators or brokers.
+function reviewImport(list, from) {
+  const usable = list.filter((c) => c.email), none = list.length - usable.length;
+  sheet(`<h2>Add ${usable.length} contact${usable.length === 1 ? '' : 's'}</h2>
+    <p class="small muted">From ${esc(from)}.${none ? ` ${none} without an email address ${none === 1 ? 'is' : 'are'} left out.` : ''}</p>
+    <label>Add them as</label><select id="ri_type"><option value="client">Clients</option><option value="operator">Operators</option><option value="broker">Brokers</option></select>
+    <div style="margin-top:10px">${list.map((c, i) => `<label class="pick-row ${c.email ? '' : 'off'}"><input type="checkbox" data-i="${i}" ${c.email ? 'checked' : 'disabled'} style="width:auto"><div class="grow"><b>${esc(c.name || '(no name)')}</b><div class="small muted">${esc([c.company, c.email || 'no email', c.phone].filter(Boolean).join(' · '))}</div></div></label>`).join('')}</div>
+    <button class="btn primary block" style="margin-top:12px" id="ri_go" ${usable.length ? '' : 'disabled'}>Add to contacts</button>`, (root) => {
+    $('#ri_go').onclick = async () => {
+      const chosen = [...root.querySelectorAll('input[data-i]:checked')].map((i) => list[+i.dataset.i]);
+      const r = await api('/contacts/bulk', { method: 'POST', body: { contacts: chosen, type: $('#ri_type').value } });
+      closeSheet(); toast(`${r.added} added${r.updated ? `, ${r.updated} updated` : ''}`); renderContacts();
+    };
+  });
+}
+
 function contactSheet(c = {}) {
   sheet(`<h2>${c.id ? 'Edit contact' : 'New contact'}</h2>
+    ${!c.id && hasPicker() ? '<button class="btn sm" id="fromPhone" style="margin-bottom:6px">Fill from iPhone contacts</button>' : ''}
     <label>Name</label><input id="n" value="${esc(c.name)}"><label>Company</label><input id="co" value="${esc(c.company)}">
     <label>Email</label><input id="e" type="email" value="${esc(c.email)}"><label>Phone</label><input id="p" type="tel" value="${esc(c.phone)}">
     <div class="grid2"><div><label>Type</label><select id="t">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${k === (c.type || 'operator') ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
@@ -591,6 +641,7 @@ function contactSheet(c = {}) {
     ${c.source === 'web' ? `<p class="small muted">Found online for ${esc(c.foundFor || '')}. Source: <a href="${esc(c.sourceUrl)}" target="_blank" rel="noopener"><u>${esc(c.sourceUrl)}</u></a></p>` : ''}
     <button class="btn primary block" style="margin-top:14px" id="sv">Save</button>
     ${c.id ? '<button class="btn danger block" style="margin-top:8px" id="dl">Delete</button>' : ''}`, () => {
+    const fp = $('#fromPhone'); if (fp) fp.onclick = async () => { try { const [x] = await pickFromPhone(false); if (x) { $('#n').value = x.name; $('#e').value = x.email; $('#p').value = x.phone; } } catch {} };
     $('#sv').onclick = async () => {
       const body = { name: $('#n').value, company: $('#co').value, email: $('#e').value, phone: $('#p').value, type: $('#t').value, region: $('#rg').value, bases: $('#bs').value.toUpperCase(), global: $('#gl').checked, fleet: $('#f').value, preferredCurrency: $('#pc').value || null };
       try { await api(c.id ? `/contacts/${c.id}` : '/contacts', { method: c.id ? 'PATCH' : 'POST', body }); closeSheet(); renderContacts(); } catch (e) { toast(e.message); }
@@ -751,9 +802,18 @@ async function route() {
 }
 window.addEventListener('hashchange', () => { closeSheet(); route(); window.scrollTo(0, 0); });
 
+// Launch splash: the poster stays at least 1.6 s (or until tapped), then fades into the app.
+const splashShown = Date.now();
+function hideSplash() {
+  const el = document.getElementById('splash'); if (!el || el.classList.contains('out')) return;
+  el.classList.add('out'); setTimeout(() => el.remove(), 600);
+}
+(() => { const el = document.getElementById('splash'); if (el) { el.onclick = hideSplash; setTimeout(hideSplash, 6000); } })();
+
 async function boot() {
-  try { state = await api('/state'); } catch { return; }
-  updateSync(); connectLive(); route();
+  try { state = await api('/state'); } catch { hideSplash(); return; }
+  updateSync(); connectLive(); await route();
+  setTimeout(hideSplash, Math.max(0, 1600 - (Date.now() - splashShown)));
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 boot();
