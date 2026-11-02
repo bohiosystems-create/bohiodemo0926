@@ -70,21 +70,8 @@ async function refreshState() {
   try { state = await api('/state'); } catch { return; }
   updateSync();
 }
-function updateSync() {
-  if (!state) return;
-  const s = state.settings, dot = $('#syncDot');
-  dot.className = 'dot ' + (s.lastPollStatus === 'error' ? 'err' : s.lastPollStatus === 'ok' ? 'ok' : '');
-  const mode = state.outlook.live ? 'Inbox' : 'Demo inbox';
-  $('#syncText').textContent = s.lastPollStatus === 'error' ? 'Sync error' : `${mode} · ${ago(s.lastPollAt)}`;
-}
-$('#syncBtn').onclick = async () => {
-  $('#syncDot').className = 'dot spin'; $('#syncText').textContent = 'Checking…';
-  try {
-    const r = await api('/poll', { method: 'POST' });
-    toast(r.skipped ? 'Already checking…' : `Checked ${r.checked} new email${r.checked === 1 ? '' : 's'}`);
-  } catch (e) { toast(e.message); }
-  await refreshState(); route();
-};
+// The inbox is still checked every minute on the server; there is no on-screen status pill.
+function updateSync() {}
 function connectLive() {
   try {
     const es = new EventSource('/api/events');
