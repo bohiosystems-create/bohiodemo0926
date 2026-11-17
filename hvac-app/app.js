@@ -205,7 +205,7 @@ function dailyChart(s) {
 function hourChart(s) {
   const p = Tracker.hourProfile(s.actual); if (!p) return '';
   const W = 600, H = 110, L = 4, T = 6, B = 18, bw = (W - L) / 24, max = Math.max(...p, 1);
-  return `<div class="sec">Typical day: average per hour</div><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Average energy by hour of day">${p.map((v, h) => { const ht = (v / max) * (H - T - B); return `<rect x="${(L + h * bw + 2).toFixed(1)}" y="${(H - B - ht).toFixed(1)}" width="${(bw - 4).toFixed(1)}" height="${ht.toFixed(1)}" rx="2" fill="var(--blue)" opacity=".85"/>`; }).join('')}${[0, 6, 12, 18, 23].map((h) => `<text x="${(L + h * bw + bw / 2).toFixed(1)}" y="${H - 4}" text-anchor="middle">${String(h).padStart(2, '0')}h</text>`).join('')}</svg>`;
+  return `<div class="sec">Hourly average</div><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Average energy by hour of day">${p.map((v, h) => { const ht = (v / max) * (H - T - B); return `<rect x="${(L + h * bw + 2).toFixed(1)}" y="${(H - B - ht).toFixed(1)}" width="${(bw - 4).toFixed(1)}" height="${ht.toFixed(1)}" rx="2" fill="var(--blue)" opacity=".85"/>`; }).join('')}${[0, 6, 12, 18, 23].map((h) => `<text x="${(L + h * bw + bw / 2).toFixed(1)}" y="${H - 4}" text-anchor="middle">${String(h).padStart(2, '0')}h</text>`).join('')}</svg>`;
 }
 function savingsCard(s) {
   if (!s.baseline.length) return `<div class="sec">Savings vs baseline</div><div class="row"><button class="btn ghost" data-act="importCSV" data-series="baseline">Import baseline CSV</button><button class="btn ghost" data-act="addReading" data-series="baseline">Add baseline reading</button></div>`;
