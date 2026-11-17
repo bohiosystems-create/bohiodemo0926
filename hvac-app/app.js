@@ -69,7 +69,7 @@ const kind = () => S.st.btype || 'apartment';
 function renderQuote() {
   const st = S.st, T = steps(); if (S.cur >= T.length) S.cur = T.length - 1;
   const k = T[S.cur], c = route(), g = gate(c, false);
-  const prog = `<div class="step">Step ${S.cur + 1} of ${T.length} · ${LBL[k]}</div><div class="progress" role="progressbar" aria-valuemin="1" aria-valuemax="${T.length}" aria-valuenow="${S.cur + 1}"><i style="width:${((S.cur + 1) / T.length) * 100}%"></i></div>`;
+  const prog = '';
   const back = S.cur > 0 ? '<button class="btn ghost" data-act="back">Back</button>' : '';
   let body = '', next = 'Next', canNext = true;
   if (Q[k]) {
@@ -143,7 +143,6 @@ function quoteView(back) {
   return `<h2>Quote: route ${c}</h2><div class="hero"><span class="code">${c}</span>
   <p style="margin:8px 0 0;font-weight:600">${NAMES[c]}</p><div class="big">${usd(r.one)}</div><p class="note" style="margin:0 0 10px">one-time, excl. VAT · ${usd(r.monthly)} / month</p>
   <div class="kv"><span>${TYPES[m.btype][0]}</span><b>${m.flats}</b></div><div class="kv"><span>Indoor units</span><b>${r.N}</b></div><div class="kv"><span>Per ${TYPES[m.btype][1]}, one-time</span><b>${usd(r.perFlat)}</b></div></div>
-  <div class="fields noprint" style="margin-top:14px"><label class="f">Client<input data-bind="client" value="${esc(st.client)}" placeholder="Client name" autocomplete="organization"></label><label class="f">Building<input data-bind="building" value="${esc(st.building)}" placeholder="Building / community"></label></div>
   ${quoteBody(r, m)}
   <div class="sec">Other offered routes, same building</div><div class="cmp">${cmp.map((x) => `<div class="c ${x.k === c ? 'me' : ''}"><div><span>${x.k} · ${NAMES[x.k]}</span><span>${usd(x.v)}</span></div><div class="bar2"><i style="width:${(x.v / max * 100).toFixed(1)}%"></i></div></div>`).join('')}</div>
   <div class="row noprint"><button class="btn" data-act="saveQuote">Save quote</button><button class="btn ghost" data-act="shareQuote">Share</button><button class="btn ghost" data-act="print">Print / PDF</button></div>${back ? `<div class="row noprint">${back}</div>` : ''}`;
@@ -166,7 +165,7 @@ async function share(text, title) {
 function renderSaved() {
   const id = S.view && S.view.saved, q = id && S.saved.find((x) => x.id === id);
   if (q) {
-    $('#app').innerHTML = `<button class="btn ghost sm noprint" data-act="savedBack">‹ All quotes</button><h2 style="margin-top:12px">${esc(q.no)}</h2><p class="help">${esc(q.m.client || 'No client name')}${q.m.building ? ', ' + esc(q.m.building) : ''} · ${new Date(q.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+    $('#app').innerHTML = `<button class="btn ghost sm noprint" data-act="savedBack">‹ All quotes</button><h2 style="margin-top:12px">${esc(q.no)}</h2><p class="help">${q.m.client ? esc(q.m.client) + (q.m.building ? ', ' + esc(q.m.building) : '') + ' · ' : ''}${new Date(q.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
     <div class="hero"><span class="code">${q.m.code}</span><p style="margin:8px 0 0;font-weight:600">${NAMES[q.m.code]}</p><div class="big">${usd(q.r.one)}</div><p class="note" style="margin:0">one-time, excl. VAT · ${usd(q.r.monthly)} / month</p></div>
     ${quoteBody(q.r, q.m)}
     <div class="row noprint"><button class="btn" data-act="shareSaved" data-id="${q.id}">Share</button><button class="btn ghost" data-act="print">Print / PDF</button></div>
@@ -174,7 +173,7 @@ function renderSaved() {
     return;
   }
   if (!S.saved.length) { $('#app').innerHTML = `<div class="empty"><b>No saved quotes</b></div>`; return; }
-  $('#app').innerHTML = `<h2>Saved quotes</h2>` + S.saved.map((q) => `<button class="card click" data-act="openSaved" data-id="${q.id}"><div class="top2"><span class="nm">${esc(q.m.client || 'Untitled')}</span><b>${usd(q.r.one)}</b></div><div class="sub">${esc(q.no)} · route ${q.m.code} · ${q.r.N} units · ${new Date(q.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div></button>`).join('');
+  $('#app').innerHTML = `<h2>Saved quotes</h2>` + S.saved.map((q) => `<button class="card click" data-act="openSaved" data-id="${q.id}"><div class="top2"><span class="nm">${esc(q.m.client || q.no)}</span><b>${usd(q.r.one)}</b></div><div class="sub">${esc(q.no)} · route ${q.m.code} · ${q.r.N} units · ${new Date(q.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div></button>`).join('');
 }
 const updateBadge = () => { $('#savedN').textContent = S.saved.length || ''; };
 
@@ -317,7 +316,6 @@ async function loadSample() {
 const TITLES = { quote: 'Quote', saved: 'Saved quotes', track: 'Consumption' };
 function render() {
   document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === S.tab));
-  $('#title').textContent = TITLES[S.tab];
   if (S.tab === 'quote') renderQuote(); else { $('#bar').hidden = true; document.documentElement.style.setProperty('--barh', '0px'); if (S.tab === 'saved') renderSaved(); else renderTrack(); }
   updateBadge(); save();
 }
