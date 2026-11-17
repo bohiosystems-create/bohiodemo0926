@@ -1,0 +1,5 @@
+NimbusSans-Regular.woff2 and NimbusSans-Bold.woff2 are subsets of Nimbus Sans
+Copyright 2015 URW Software; 2013, 2014 (URW)++ Design & Development.
+Licensed under the GNU Affero General Public License v3 with the font exception:
+documents (including web pages) that embed these fonts are not covered by the AGPL.
+Source: https://github.com/ArtifexSoftware/urw-base35-fonts

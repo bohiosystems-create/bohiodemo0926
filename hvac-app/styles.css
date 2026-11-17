@@ -1,5 +1,8 @@
 /* Mobile-first. Palette from the Bohio quoting wizard: route blue, amber current stop, green/red for risk. */
-:root{--font:"Helvetica Neue",Helvetica,Arial,sans-serif;color-scheme:light dark;--bg:light-dark(#ffffff,#0e1116);--ink:light-dark(#111418,#eef1f5);--mute:light-dark(#5b6470,#9aa4b2);--line:light-dark(#e3e7ec,#262c35);--panel:light-dark(#f4f7fb,#161b22);--blue:light-dark(#0a5cff,#5b8cff);--amber:#ffb400;--green:light-dark(#00a05a,#2fd08a);--red:light-dark(#e6261f,#ff6b63);--tabh:60px;--barh:0px}
+/* Helvetica: the real Helvetica Neue where the device has it (Apple), else the bundled Nimbus Sans clone. */
+@font-face{font-family:"Bohio Helvetica";font-weight:400;font-display:swap;src:local("Helvetica Neue"),local("HelveticaNeue"),url(fonts/NimbusSans-Regular.woff2) format("woff2")}
+@font-face{font-family:"Bohio Helvetica";font-weight:700;font-display:swap;src:local("Helvetica Neue Bold"),local("HelveticaNeue-Bold"),url(fonts/NimbusSans-Bold.woff2) format("woff2")}
+:root{--font:"Bohio Helvetica","Helvetica Neue",Helvetica,Arial,sans-serif;color-scheme:light dark;--bg:light-dark(#ffffff,#0e1116);--ink:light-dark(#111418,#eef1f5);--mute:light-dark(#5b6470,#9aa4b2);--line:light-dark(#e3e7ec,#262c35);--panel:light-dark(#f4f7fb,#161b22);--blue:light-dark(#0a5cff,#5b8cff);--amber:#ffb400;--green:light-dark(#00a05a,#2fd08a);--red:light-dark(#e6261f,#ff6b63);--tabh:60px;--barh:0px}
 *{box-sizing:border-box;min-width:0}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--font);letter-spacing:-.005em;-webkit-text-size-adjust:100%;overflow-x:clip;padding-bottom:calc(var(--tabh) + var(--barh) + env(safe-area-inset-bottom) + 16px)}
