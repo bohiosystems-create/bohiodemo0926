@@ -193,19 +193,22 @@ function dailyChart(s) {
   const am = new Map(a), bm = new Map(b), W = 600, H = 190, L = 34, R = 6, T = 8, B = 22, iw = W - L - R, ih = H - T - B;
   const max = Math.max(1, ...days.map((d) => Math.max(am.get(d) || 0, bm.get(d) || 0))), mag = Math.pow(10, Math.floor(Math.log10(max))), top = Math.ceil(max / (mag / 2)) * (mag / 2);
   const y = (v) => T + ih - (v / top) * ih, bw = iw / days.length;
-  const bars = days.map((d, i) => am.has(d) ? `<rect x="${(L + i * bw + bw * 0.15).toFixed(1)}" y="${y(am.get(d)).toFixed(1)}" width="${(bw * 0.7).toFixed(1)}" height="${(T + ih - y(am.get(d))).toFixed(1)}" rx="2" fill="var(--blue)"/>` : '').join('');
+  const bars = days.map((d, i) => am.has(d) ? `<rect class="b" data-i="${i}" x="${(L + i * bw + bw * 0.15).toFixed(1)}" y="${y(am.get(d)).toFixed(1)}" width="${(bw * 0.7).toFixed(1)}" height="${(T + ih - y(am.get(d))).toFixed(1)}" rx="2" fill="var(--blue)"/>` : '').join('');
   const pts = days.map((d, i) => bm.has(d) ? `${(L + i * bw + bw / 2).toFixed(1)},${y(bm.get(d)).toFixed(1)}` : null).filter(Boolean);
   const line = pts.length > 1 ? `<polyline points="${pts.join(' ')}" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-linejoin="round"/>` : (pts.length ? `<circle cx="${pts[0].split(',')[0]}" cy="${pts[0].split(',')[1]}" r="3.5" fill="var(--amber)"/>` : '');
   const grid = [0, 0.5, 1].map((f) => `<line x1="${L}" x2="${W - R}" y1="${y(top * f).toFixed(1)}" y2="${y(top * f).toFixed(1)}" stroke="var(--line)"/><text x="${L - 4}" y="${(y(top * f) + 3).toFixed(1)}" text-anchor="end">${num(top * f)}</text>`).join('');
   const xl = [0, Math.floor((days.length - 1) / 2), days.length - 1].filter((v, i, ar) => ar.indexOf(v) === i).map((i) => `<text x="${(L + i * bw + bw / 2).toFixed(1)}" y="${H - 6}" text-anchor="${i === 0 ? 'start' : i === days.length - 1 ? 'end' : 'middle'}">${fmtDay(days[i])}</text>`).join('');
-  const hit = days.map((d, i) => `<rect x="${(L + i * bw).toFixed(1)}" y="${T}" width="${bw.toFixed(1)}" height="${ih}" fill="transparent" data-act="barTap" data-d="${d}"/>`).join('');
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily HVAC energy in kWh">${grid}${bars}${line}${xl}${hit}</svg>
-  <div class="legend"><span><i style="background:var(--blue)"></i>Actual</span>${pts.length ? '<span><i style="background:var(--amber)"></i>Baseline</span>' : ''}</div><div class="readout" id="readout"></div>`;
+  CH.daily = { n: days.length, L, bw, W, H, T, ih, top, label: (i) => {
+    const d = days[i], A = am.get(d), Bv = bm.get(d);
+    return `<b>${fmtDay(d)}</b>${A != null ? `<span>Actual ${num(A, 1)}</span>` : '<span>No reading</span>'}${Bv != null ? `<span>Baseline ${num(Bv, 1)}</span>` : ''}${A != null && Bv ? `<span>${A <= Bv ? '▼' : '▲'} ${Math.abs((A - Bv) / Bv * 100).toFixed(1)}%</span>` : ''}`; } };
+  return `<div class="chartwrap" data-chart="daily"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily HVAC energy">${grid}${bars}${line}${xl}<line class="guide" y1="${T}" y2="${T + ih}" stroke="var(--amber)" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/></svg><div class="tip" hidden></div></div>
+  <div class="legend"><span><i style="background:var(--blue)"></i>Actual</span>${pts.length ? '<span><i style="background:var(--amber)"></i>Baseline</span>' : ''}</div>`;
 }
 function hourChart(s) {
   const p = Tracker.hourProfile(s.actual); if (!p) return '';
   const W = 600, H = 110, L = 4, T = 6, B = 18, bw = (W - L) / 24, max = Math.max(...p, 1);
-  return `<div class="sec">Hourly average</div><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Average energy by hour of day">${p.map((v, h) => { const ht = (v / max) * (H - T - B); return `<rect x="${(L + h * bw + 2).toFixed(1)}" y="${(H - B - ht).toFixed(1)}" width="${(bw - 4).toFixed(1)}" height="${ht.toFixed(1)}" rx="2" fill="var(--blue)" opacity=".85"/>`; }).join('')}${[0, 6, 12, 18, 23].map((h) => `<text x="${(L + h * bw + bw / 2).toFixed(1)}" y="${H - 4}" text-anchor="middle">${String(h).padStart(2, '0')}h</text>`).join('')}</svg>`;
+  CH.hour = { n: 24, L, bw, W, H, T, ih: H - T - B, label: (h) => `<b>${String(h).padStart(2, '0')}:00</b><span>${num(p[h], 1)}</span>` };
+  return `<div class="sec">Hourly average</div><div class="chartwrap" data-chart="hour"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Average energy by hour of day">${p.map((v, h) => { const ht = (v / max) * (H - T - B); return `<rect class="b" data-i="${h}" x="${(L + h * bw + 2).toFixed(1)}" y="${(H - B - ht).toFixed(1)}" width="${(bw - 4).toFixed(1)}" height="${ht.toFixed(1)}" rx="2" fill="var(--blue)"/>`; }).join('')}${[0, 6, 12, 18, 23].map((h) => `<text x="${(L + h * bw + bw / 2).toFixed(1)}" y="${H - 4}" text-anchor="middle">${String(h).padStart(2, '0')}h</text>`).join('')}<line class="guide" y1="${T}" y2="${H - B}" stroke="var(--amber)" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/></svg><div class="tip" hidden></div></div>`;
 }
 function savingsCard(s) {
   if (!s.baseline.length) return `<div class="sec">Savings vs baseline</div><div class="row"><button class="btn ghost" data-act="importCSV" data-series="baseline">Import baseline CSV</button><button class="btn ghost" data-act="addReading" data-series="baseline">Add baseline reading</button></div>`;
@@ -236,7 +239,7 @@ function renderTrack() {
   <div class="tile"><small>Cost, last ${k.days} days</small><b>AED ${num(k.cost)}</b></div><div class="tile"><small>Logged</small><b>${num(k.total)}</b><em style="color:var(--mute)">${k.nDays} days</em></div></div>
   <div style="margin:8px 0 10px"><select class="sm" data-bind="range" aria-label="Time frame">${[[7, '7 days'], [30, '30 days'], [0, 'All time']].map(([v, l]) => `<option value="${v}" ${S.range === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>${dailyChart(s)}${hourChart(s)}` : (s.baseline.length ? dailyChart(s) : '<p class="help" style="margin-top:12px">No readings yet. Add one, or import a CSV.</p>')}
   ${savingsCard(s)}
-  <div class="sec">Data</div><div class="row" style="margin-top:10px"><button class="btn" data-act="addReading" data-series="actual">Add reading</button><button class="btn ghost ico" data-act="importCSV" data-series="actual" aria-label="Import"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11 M7 11l5 5 5-5 M5 20h14"/></svg></button><button class="btn ghost ico" data-act="exportCSV" aria-label="Export"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V5 M7 9l5-5 5 5 M5 20h14"/></svg></button></div>`;
+  <div class="sec">Data</div><div class="row" style="margin-top:10px;align-items:center"><button class="btn" data-act="addReading" data-series="actual">Add reading</button><button class="icon-btn" data-act="importCSV" data-series="actual" aria-label="Import"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11 M7 11l5 5 5-5 M5 20h14"/></svg></button><button class="icon-btn" data-act="exportCSV" aria-label="Export"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V5 M7 9l5-5 5 5 M5 20h14"/></svg></button></div>`;
 }
 function siteCard(s) {
   const k = trackerKpis(s), sv = s.baseline.length && Tracker.savings(s.baseline, s.actual, s.tariff, s.grid);
@@ -249,6 +252,36 @@ function renderSiteSettings(s) {
   <label class="f">Grid factor, kg CO₂e/kWh<input type="number" inputmode="decimal" step="0.01" data-bind="s_grid" value="${s.grid}"></label></div>
   <div class="row"><button class="btn ghost" data-act="clearSeries" data-series="baseline">Clear baseline</button><button class="btn danger" data-act="delSite">Delete site</button></div>`;
 }
+
+/* interactive charts: hover, tap or drag across a chart to read values */
+const CH = {};
+function chartClear(w) {
+  w.querySelectorAll('rect.b').forEach((b) => b.removeAttribute('opacity'));
+  const g = w.querySelector('.guide'); if (g) g.setAttribute('visibility', 'hidden');
+  const t = w.querySelector('.tip'); if (t) t.hidden = true;
+}
+function chartSelect(w, ev) {
+  const d = CH[w.dataset.chart], svg = w.querySelector('svg'); if (!d) return;
+  const r = svg.getBoundingClientRect(), x = ((ev.clientX - r.left) * d.W) / r.width;
+  const i = Math.max(0, Math.min(d.n - 1, Math.floor((x - d.L) / d.bw)));
+  w.querySelectorAll('rect.b').forEach((b) => b.setAttribute('opacity', +b.dataset.i === i ? '1' : '0.35'));
+  const cx = d.L + i * d.bw + d.bw / 2, g = w.querySelector('.guide');
+  g.setAttribute('x1', cx); g.setAttribute('x2', cx); g.setAttribute('visibility', 'visible');
+  const t = w.querySelector('.tip'); t.innerHTML = d.label(i); t.hidden = false;
+  const px = (cx / d.W) * r.width, tw = t.offsetWidth, gap = 12;
+  const left = px < r.width / 2 ? px + gap : px - tw - gap;      // beside the bar, never on top of it
+  t.style.left = Math.max(0, Math.min(r.width - tw, left)) + 'px';
+}
+document.addEventListener('pointerdown', (e) => {
+  const w = e.target.closest && e.target.closest('[data-chart]');
+  document.querySelectorAll('[data-chart]').forEach((c) => { if (c !== w) chartClear(c); });
+  if (w) chartSelect(w, e);
+});
+document.addEventListener('pointermove', (e) => {
+  const w = e.target.closest && e.target.closest('[data-chart]');
+  if (w) { if (e.pointerType === 'mouse' || e.buttons) { document.querySelectorAll('[data-chart]').forEach((c) => { if (c !== w) chartClear(c); }); chartSelect(w, e); } }
+  else if (e.pointerType === 'mouse') document.querySelectorAll('[data-chart]').forEach(chartClear);
+});
 
 /* sheets */
 function openSheet(html) { const sh = $('#sheet'); sh.innerHTML = `<div role="dialog" aria-modal="true">${html}</div>`; sh.hidden = false; const f = sh.querySelector('input,select'); if (f) f.focus(); }
@@ -338,7 +371,6 @@ document.addEventListener('click', (e) => {
     case 'delSite': if (confirm('Delete this site and all its readings?')) { S.sites = S.sites.filter((x) => x.id !== S.site); S.site = null; S.view = null; render(); } break;
     case 'clearSeries': if (confirm('Clear the baseline readings?')) { site()[d.series] = []; render(); } break;
     case 'range': S.range = +d.v; render(); break;
-    case 'barTap': { const s = site(), am = new Map(Tracker.daily(s.actual)), bm = new Map(Tracker.daily(s.baseline)); $('#readout').textContent = `${fmtDay(d.d)}: ${am.has(d.d) ? num(am.get(d.d), 1) + ' actual' : 'no actual reading'}${bm.has(d.d) ? ` · baseline ${num(bm.get(d.d), 1)}` : ''}`; break; }
     case 'addReading': readingSheet(d.series); break;
     case 'importCSV': csvSheet(d.series); break;
     case 'exportCSV': exportCSV(); break;

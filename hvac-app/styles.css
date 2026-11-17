@@ -131,4 +131,10 @@ pre.calc{white-space:pre;overflow-x:auto;font:11.5px/1.6 ui-monospace,Menlo,Cons
 @media(prefers-reduced-motion:no-preference){.toast{transition:opacity .2s,transform .2s}.progress i{transition:width .25s}}
 @media print{.top,.tabs,.bar,.noprint,.toast,.sheet{display:none!important}body{padding:0}main{max-width:none}}
 
-.row .btn.ico{flex:0 0 54px;padding:0}
+
+.chartwrap{position:relative}
+.chartwrap svg.chart{cursor:crosshair;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.tip{position:absolute;top:0;z-index:2;pointer-events:none;display:grid;gap:1px;min-width:96px;padding:7px 10px;background:var(--bg);border:1px solid var(--line2);border-radius:12px;font-size:12px;line-height:1.35;color:var(--ink)}
+.tip[hidden]{display:none}
+.tip b{font-size:13px}
+.tip span{color:var(--mute);font-variant-numeric:tabular-nums}
