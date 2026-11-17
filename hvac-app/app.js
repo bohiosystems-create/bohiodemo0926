@@ -5,7 +5,6 @@ const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const usd = (v) => '$' + Math.round(v).toLocaleString('en-US');
 const num = (v, d = 0) => Number(v).toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d });
-const AED_PER_USD = 3.6725; // fixed peg
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const fmtDay = (d) => `${MON[+d.slice(5, 7) - 1]} ${+d.slice(8, 10)}`;
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -216,10 +215,10 @@ function savingsCard(s) {
   const cov = r.n < r.baseCount || r.n < r.actCount ? `Compared ${num(r.n)} matching intervals (baseline has ${num(r.baseCount)}, actual ${num(r.actCount)}).` : `Compared ${num(r.n)} intervals.`;
   const txt = [`Period: ${r.first.replace('T', ' ').slice(0, 16)} -> ${r.last.replace('T', ' ').slice(0, 16)} (${r.n} intervals, ${r.days.toFixed(2)} days)`, '',
     `1. Baseline HVAC energy        B = ${f(r.baseline)} kWh`, `2. Optimised HVAC energy       C = ${f(r.actual)} kWh`, `3. Energy saved            B - C = ${f(r.baseline)} - ${f(r.actual)} = ${f(r.saved)} kWh`,
-    `4. Saving %          (B - C) / B = ${f(r.saved)} / ${f(r.baseline)} = ${r.pct.toFixed(1)}%`, `5. Cost saved        kWh x tariff = ${f(r.saved)} x ${s.tariff} AED/kWh = AED ${f(aed, 0)}  (about ${usd(aed / AED_PER_USD)})`,
+    `4. Saving %          (B - C) / B = ${f(r.saved)} / ${f(r.baseline)} = ${r.pct.toFixed(1)}%`, `5. Cost saved        kWh x tariff = ${f(r.saved)} x ${s.tariff} AED/kWh = AED ${f(aed, 0)}`,
     `6. CO2 avoided  kWh x grid factor = ${f(r.saved)} x ${s.grid} kg/kWh / 1000 = ${r.tco2.toFixed(2)} tCO2e`].join('\n');
   const good = r.saved >= 0;
-  return `<div class="sec">Savings vs baseline</div><div class="tiles"><div class="tile"><small>Energy saved</small><b class="${good ? 'down' : 'up'}">${good ? '' : '+'}${f(Math.abs(r.saved), 0)}</b><em>${r.pct.toFixed(1)}% vs baseline</em></div><div class="tile"><small>Cost ${good ? 'saved' : 'extra'}</small><b>AED ${f(Math.abs(aed), 0)}</b><em>≈ ${usd(Math.abs(aed) / AED_PER_USD)}</em></div></div>
+  return `<div class="sec">Savings vs baseline</div><div class="tiles"><div class="tile"><small>Energy saved</small><b class="${good ? 'down' : 'up'}">${good ? '' : '+'}${f(Math.abs(r.saved), 0)}</b><em>${r.pct.toFixed(1)}% vs baseline</em></div><div class="tile"><small>Cost ${good ? 'saved' : 'extra'}</small><b>AED ${f(Math.abs(aed), 0)}</b></div></div>
   <pre class="calc">${esc(txt)}</pre>
   <div class="row"><button class="btn ghost sm" data-act="copyCalc">Copy</button></div>`;
 }
@@ -235,7 +234,7 @@ function renderTrack() {
   $('#app').innerHTML = `<div class="top2" style="align-items:center"><h2 style="margin:0">${esc(s.name)}</h2><button class="btn ghost sm" data-act="siteSettings" aria-label="Settings" style="min-width:40px;padding:6px 10px"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button></div>${sw ? `<div style="margin-top:10px">${sw}</div>` : ''}
   ${k ? `<div class="tiles"><div class="tile"><small>Last ${k.days} days</small><b>${num(k.l7)}</b>${k.delta != null ? `<em class="${k.delta > 0 ? 'up' : 'down'}">${k.delta > 0 ? '▲' : '▼'} ${Math.abs(k.delta).toFixed(1)}% vs prior 7 days</em>` : '<em style="color:var(--mute)">no prior week yet</em>'}</div>
   <div class="tile"><small>Daily average</small><b>${num(k.avg)}</b><em style="color:var(--mute)">to ${fmtDay(k.latest)}</em></div>
-  <div class="tile"><small>Cost, last ${k.days} days</small><b>AED ${num(k.cost)}</b><em style="color:var(--mute)">≈ ${usd(k.cost / AED_PER_USD)}</em></div><div class="tile"><small>Logged</small><b>${num(k.total)}</b><em style="color:var(--mute)">${k.nDays} days</em></div></div>
+  <div class="tile"><small>Cost, last ${k.days} days</small><b>AED ${num(k.cost)}</b></div><div class="tile"><small>Logged</small><b>${num(k.total)}</b><em style="color:var(--mute)">${k.nDays} days</em></div></div>
   <div style="margin:8px 0 10px;max-width:200px"><select data-bind="range" aria-label="Time frame">${[[7, 'Last 7 days'], [30, 'Last 30 days'], [0, 'All time']].map(([v, l]) => `<option value="${v}" ${S.range === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>${dailyChart(s)}${hourChart(s)}` : (s.baseline.length ? dailyChart(s) : '<p class="help" style="margin-top:12px">No readings yet. Add one, or import a CSV.</p>')}
   ${savingsCard(s)}
   <div class="sec">Data</div><div class="row" style="margin-top:10px"><button class="btn" data-act="addReading" data-series="actual">Add reading</button><button class="btn ghost" data-act="importCSV" data-series="actual">Import CSV</button><button class="btn ghost" data-act="exportCSV">Export CSV</button></div>
