@@ -40,10 +40,10 @@ h3{font-size:16px;margin:0 0 8px}
 .ring{flex:none;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--line2);background:var(--bg)}
 .opt.on .ring{border:5px solid var(--ink)}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--line2);outline-offset:2px}
-.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-label.f{display:grid;gap:6px;font-size:13px;color:var(--mute);align-content:start}
+.fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+label.f{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;font-size:13px;color:var(--mute);align-content:start}
 label.f small{color:var(--mute)}
-input,select{font:16px var(--font);color:var(--ink);padding:10px 12px;min-height:44px;border:1px solid var(--line);border-radius:14px;background:var(--panel);width:100%}
+input,select{min-width:0;max-width:100%;font:16px var(--font);color:var(--ink);padding:10px 12px;min-height:44px;border:1px solid var(--line);border-radius:14px;background:var(--panel);width:100%}
 button.icon-btn{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border:0;background:none;color:var(--ink);cursor:pointer;padding:0}
 select.sm{width:auto;min-height:34px;padding:4px 10px;font-size:14px;border-radius:12px}
 input:focus,select:focus{background:var(--bg);border-color:var(--line2);outline:none}
@@ -139,3 +139,5 @@ pre.calc{white-space:pre;overflow-x:auto;font:11.5px/1.6 ui-monospace,Menlo,Cons
 .tip b{font-size:13px}
 .tip span{color:var(--mute);font-variant-numeric:tabular-nums}
 button.icon-btn:focus-visible{border-radius:12px;outline-offset:-2px}
+button.icon-btn.back{margin-left:-10px;justify-content:flex-start;padding-left:10px;width:48px}
+.row button.icon-btn.back{flex:0 0 48px;margin-left:-10px}

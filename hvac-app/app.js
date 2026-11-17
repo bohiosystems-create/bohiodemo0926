@@ -69,7 +69,7 @@ function renderQuote() {
   const st = S.st, T = steps(); if (S.cur >= T.length) S.cur = T.length - 1;
   const k = T[S.cur], c = route(), g = gate(c, false);
   const prog = '';
-  const back = S.cur > 0 ? '<button class="btn ghost" data-act="back">Back</button>' : '';
+  const back = S.cur > 0 ? '<button class="icon-btn back" data-act="back" aria-label="Back"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>' : '';
   let body = '', next = 'Next', canNext = true;
   if (Q[k]) {
     const d = Q[k]; canNext = answered(k);
@@ -164,7 +164,7 @@ async function share(text, title) {
 function renderSaved() {
   const id = S.view && S.view.saved, q = id && S.saved.find((x) => x.id === id);
   if (q) {
-    $('#app').innerHTML = `<button class="btn ghost sm noprint" data-act="savedBack">‹ All quotes</button><h2 style="margin-top:12px">${esc(q.no)}</h2><p class="help">${q.m.client ? esc(q.m.client) + (q.m.building ? ', ' + esc(q.m.building) : '') + ' · ' : ''}${new Date(q.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+    $('#app').innerHTML = `<button class="icon-btn back noprint" data-act="savedBack" aria-label="Back"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><h2 style="margin-top:12px">${esc(q.no)}</h2><p class="help">${q.m.client ? esc(q.m.client) + (q.m.building ? ', ' + esc(q.m.building) : '') + ' · ' : ''}${new Date(q.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
     <div class="hero"><span class="code">${q.m.code}</span><p style="margin:8px 0 0;font-weight:600">${NAMES[q.m.code]}</p><div class="big">${usd(q.r.one)}</div><p class="note" style="margin:0">one-time, excl. VAT · ${usd(q.r.monthly)} / month</p></div>
     ${quoteBody(q.r, q.m)}
     <div class="row noprint"><button class="btn" data-act="shareSaved" data-id="${q.id}">Share</button><button class="btn ghost" data-act="print">Print / PDF</button></div>
@@ -246,7 +246,7 @@ function siteCard(s) {
   return `<button class="card click" data-act="openSite" data-id="${s.id}"><div class="top2"><span class="nm">${esc(s.name)}</span></div><div class="sub">${k ? `${num(k.total)} over ${k.nDays} days` : 'No readings yet'}${sv ? ` · saving ${sv.pct.toFixed(1)}%` : ''}</div></button>`;
 }
 function renderSiteSettings(s) {
-  $('#app').innerHTML = `<button class="btn ghost sm" data-act="settingsBack">‹ Back</button><h2 style="margin-top:12px">Site settings</h2>
+  $('#app').innerHTML = `<button class="icon-btn back" data-act="settingsBack" aria-label="Back"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><h2 style="margin-top:12px">Site settings</h2>
   <div class="fields"><label class="f" style="grid-column:1/-1">Site name<input data-bind="s_name" value="${esc(s.name)}"></label>
   <label class="f">Tariff, AED per kWh<input type="number" inputmode="decimal" step="0.01" data-bind="s_tariff" value="${s.tariff}"></label>
   <label class="f">Grid factor, kg CO₂e/kWh<input type="number" inputmode="decimal" step="0.01" data-bind="s_grid" value="${s.grid}"></label></div>
