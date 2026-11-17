@@ -138,3 +138,4 @@ pre.calc{white-space:pre;overflow-x:auto;font:11.5px/1.6 ui-monospace,Menlo,Cons
 .tip[hidden]{display:none}
 .tip b{font-size:13px}
 .tip span{color:var(--mute);font-variant-numeric:tabular-nums}
+button.icon-btn:focus-visible{border-radius:12px;outline-offset:-2px}
