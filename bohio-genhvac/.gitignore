@@ -1,0 +1,10 @@
+vendor/
+__pycache__/
+*.pyc
+logs/
+*.npz
+*.pt
+*.ckpt
+.env
+.pytest_cache/
+*.db

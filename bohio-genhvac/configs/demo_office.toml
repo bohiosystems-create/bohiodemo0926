@@ -1,0 +1,27 @@
+# Demo site for the simulated day: a 5-zone Dubai office, cooling only.
+name = "Demo office, Dubai"
+building_type = "office"
+cooling_source = "electric"
+mode = "shadow"
+cycle_minutes = 15
+
+[[zones]]
+name = "lobby"
+kind = "common"
+occupancy_sensing = "pir"
+
+[[zones]]
+name = "open_plan_a"
+kind = "suite"
+
+[[zones]]
+name = "open_plan_b"
+kind = "suite"
+
+[[zones]]
+name = "meeting_room"
+kind = "room"
+
+[[zones]]
+name = "executive"
+kind = "suite"

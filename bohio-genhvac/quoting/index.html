@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HVAC Retrofit Quoter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE work tool: a sales engineer quoting a building, calm and exact
+   IDEA a metro line: each question is a station, the chosen route lights up to the quote terminus
+   PICTURE the route strip across the top plus a live quote ticket beside the questions
+   COLOUR white, ink, route blue #0a5cff, current station amber #ffb400, green #00a05a for low risk, red #e6261f for risk; night #0e1116
+   TYPE Figtree 800 for titles and figures, Figtree 400/600 for text
+   LAYOUT laptop: route strip full width, question card left, sticky quote ticket right; phone: strip, slim total bar, question */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0e1116);--ink:light-dark(#111418,#eef1f5);--mute:light-dark(#5b6470,#9aa4b2);--line:light-dark(#e3e7ec,#262c35);--panel:light-dark(#f4f7fb,#161b22);--blue:light-dark(#0a5cff,#5b8cff);--amber:#ffb400;--green:light-dark(#00a05a,#2fd08a);--red:light-dark(#e6261f,#ff6b63)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 Figtree,system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(20px,3vw,40px) max(5vw,16px)}
+.wrap{max-width:1240px;margin:0 auto}
+h1{font-weight:800;font-size:clamp(30px,4vw,44px);line-height:1.05;letter-spacing:-.02em;margin:0 0 6px;text-wrap:balance}
+.sub{color:var(--mute);margin:0;max-width:62ch}
+.metro{display:flex;align-items:flex-start;margin:26px 0 4px;overflow-x:auto;padding-bottom:6px}
+.st{flex:1 0 92px;position:relative;text-align:center;font-size:13px;color:var(--mute);cursor:pointer;background:none;border:0;padding:0;font-family:inherit}
+.st::before{content:"";position:absolute;top:13px;left:-50%;width:100%;height:8px;background:var(--line);z-index:0}
+.st:first-child::before{display:none}
+.st.done::before,.st.cur::before{background:var(--blue)}
+.dot{position:relative;z-index:1;display:block;width:34px;height:34px;margin:0 auto 6px;border-radius:50%;background:var(--bg);border:6px solid var(--line)}
+.st.done .dot{border-color:var(--blue);background:var(--blue)}
+.st.cur .dot{border-color:var(--amber);background:var(--bg);box-shadow:0 0 0 4px color-mix(in srgb,var(--amber) 30%,transparent)}
+.st.cur{color:var(--ink);font-weight:600}
+.grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:28px;align-items:start}
+.card{border:1px solid var(--line);border-radius:14px;padding:clamp(18px,2.5vw,28px)}
+.q h2{font-size:26px;line-height:1.15;margin:0 0 6px;font-weight:800;letter-spacing:-.01em}
+.q .help{color:var(--mute);margin:0 0 18px}
+.opts{display:grid;gap:10px}
+.opt{display:flex;gap:14px;align-items:flex-start;text-align:left;width:100%;min-height:44px;padding:14px 16px;border:2px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);font:inherit;cursor:pointer}
+.opt:hover{border-color:color-mix(in srgb,var(--blue) 50%,var(--line))}
+.opt:focus-visible,.btn:focus-visible,input:focus-visible,.st:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+.opt.on{border-color:var(--blue);background:color-mix(in srgb,var(--blue) 8%,var(--bg))}
+.opt b{display:block;font-weight:600}
+.opt span{color:var(--mute);font-size:14px}
+.ring{flex:none;width:20px;height:20px;margin-top:2px;border-radius:50%;border:2px solid var(--mute)}
+.opt.on .ring{border:6px solid var(--blue)}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(12em,1fr));gap:14px}
+label.f{display:grid;gap:4px;font-weight:600;font-size:14px}
+label.f small{font-weight:400;color:var(--mute)}
+input[type=number]{font:16px Figtree,sans-serif;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);width:100%}
+.chk{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.chk input{width:22px;height:22px;margin-top:2px;accent-color:var(--blue)}
+.chk span{color:var(--mute);font-size:14px;display:block}
+.nav{display:flex;justify-content:space-between;gap:12px;margin-top:22px;flex-wrap:wrap}
+.btn{min-height:44px;padding:10px 20px;border-radius:999px;border:2px solid var(--blue);background:var(--blue);color:#fff;font:600 16px Figtree,sans-serif;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--blue)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.ticket{position:sticky;top:16px;background:var(--panel);border-radius:14px;padding:22px;border:1px solid var(--line)}
+.ticket .code{display:inline-block;font-weight:800;color:#fff;background:var(--blue);border-radius:999px;padding:2px 12px;font-size:14px}
+.ticket .rname{font-weight:600;margin:8px 0 2px}
+.big{font-weight:800;font-size:clamp(34px,5vw,48px);line-height:1.05;letter-spacing:-.02em;margin:14px 0 2px;white-space:nowrap}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:15px}
+.kv b,.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.risk{display:inline-block;font-size:13px;font-weight:600;padding:2px 10px;border-radius:999px;margin-top:6px}
+.risk.low{background:color-mix(in srgb,var(--green) 18%,transparent);color:var(--green)}
+.risk.mid{background:color-mix(in srgb,var(--amber) 22%,transparent);color:light-dark(#8a5d00,#ffcf5c)}
+.risk.high{background:color-mix(in srgb,var(--red) 16%,transparent);color:var(--red)}
+.note{font-size:14px;color:var(--mute);margin:10px 0 0}
+.warn{border-left:4px solid var(--amber);padding:8px 12px;background:color-mix(in srgb,var(--amber) 10%,transparent);border-radius:0 8px 8px 0;font-size:14px;margin:14px 0 0}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:13px;color:var(--mute);font-weight:600}
+td.r,th.r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+tr.grp td{font-weight:800;padding-top:18px;border-bottom:2px solid var(--ink)}
+tr.tot td{font-weight:800}
+.scroll{overflow-x:auto}
+.cmp .bar{height:10px;border-radius:5px;background:var(--line)}
+.cmp .bar i{display:block;height:100%;border-radius:5px;background:color-mix(in srgb,var(--blue) 45%,var(--line))}
+.cmp tr.me .bar i{background:var(--blue)}
+.cmp tr.me td{font-weight:700}
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(15em,1fr));gap:12px;margin-top:10px}
+.rules div{background:var(--panel);border-radius:10px;padding:12px 14px;font-size:14px}
+.rules b{display:block}
+details{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-weight:600;min-height:32px}
+.mbar{display:none}
+@media(max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}.ticket{position:static}.mbar{display:flex;position:sticky;top:0;z-index:5;justify-content:space-between;align-items:center;gap:10px;background:var(--blue);color:#fff;padding:10px 16px;font-weight:600}}
+@media(max-width:600px){table{font-size:13px}th,td{padding:6px 4px}.st{flex-basis:76px;font-size:12px}}
+@media(prefers-reduced-motion:no-preference){.dot{transition:border-color .25s,background .25s}.st::before{transition:background .25s}}
+</style>
+</head>
+<body>
+<div class="mbar" id="mbar"><span id="mcode">Answer to price</span><span class="num" id="mtot"></span></div>
+<section class="band"><div class="wrap">
+<h1>Quote an AI HVAC retrofit</h1>
+<p class="sub">Answer a few questions about the building. The route and price update as you go, and the last stop is an itemised quote.</p>
+<nav class="metro" id="metro" aria-label="Steps"></nav>
+<div class="grid">
+<div class="card q" id="q"></div>
+<aside class="ticket" id="ticket" aria-live="polite"></aside>
+</div>
+</div></section>
+<script>
+{
+/*CALC*/
+const USD={wt301:114.94,wt201:135.585,ws202:58.5,vs370:111.435,ws301:63.19,ug65:383.99,rut956:275,revpi:479.28,ct101:105.3,sensibo:217.2954,intesis:289.02,hexa:57};
+const P0={margin:25,landed:12,tstat:40,cable:70,sensor:10,platform:5.5,contractor:5500,upgrade:7000};
+const NAMES={A1:'Open BMS: supervisory setpoint control',A2:'Legacy BMS: upgrade, then control',A3:'BMS read-only: advisory mode',B1:'Fan coils: keep Modbus thermostats, wire RS485',B2:'Fan coils: wireless LoRaWAN thermostats',B3:'Fan coils: wired Modbus thermostats',C1:'Split ACs: IR controllers',C2:'Split ACs: wired two-way gateways',D1:'Ducted DX: 24 V LoRaWAN thermostats',E1:'VRF: gateway on the central controller'};
+const TYPES={apartment:['Flats','flat',20,3,7],office:['Office suites','suite',10,6,6],hotel:['Guest rooms','room',40,1,8],retail:['Shops','shop',15,2,6],villa:['Villas','villa',20,5,0]};
+const SENSE={apartment:'Occupancy (apartments): motion sensors in common areas only; sensors inside flats are an option that needs tenant consent. A flat counts as empty only after hours without activity, never minutes.',office:'Occupancy (offices): radar presence in every zone, because motion (PIR) sensors miss people sitting still at desks. Schedules follow working hours; radar catches empty floors and meeting rooms.',hotel:'Occupancy (hotels): a motion sensor plus a door contact in every room tells a guest who is in from a room left empty; where keycard switches exist they can be read too.',retail:'Occupancy (retail): cooling follows opening hours; a motion sensor per shop catches cooling left on after closing. Entrance people counters can be added on request.',villa:'Occupancy (villas): one sensor per villa detects homes left empty, for example during travel; schedules handle the rest.'};
+const BALC={apartment:'Balcony door contact in each flat',hotel:'Balcony door contact in each guest room',villa:'Terrace door contact in each villa'};
+const RISK={A1:['mid','Depends on BMS contractor'],A2:['high','Upgrade needed first'],A3:['low','No write access needed'],B1:['low','Reuses what is there'],B2:['low','No new cabling'],B3:['mid','Cabling in occupied flats'],C1:['mid','One-way control'],C2:['high','Highest cost'],D1:['low','Simple swap'],E1:['low','One integration point']};
+function price(code,st,p){
+  const cp=u=>Math.ceil(u*(1+p.landed/100)*(1+p.margin/100));
+  const BT=st.btype||'apartment', N=st.flats*st.perFlat+st.common, F=st.flats, C=st.common, hw=[], sv=[], op=[], notes=[];
+  const L=(a,n,q,u)=>a.push({n,q,u,t:q*u});
+  let mo=p.platform;
+  if(code[0]==='A'){
+    L(hw,'Revolution Pi edge controller (local logic, guardrails, fallback)',1,cp(USD.revpi));
+    L(hw,'Teltonika RUT956 4G router with VPN',1,cp(USD.rut956));
+    L(hw,'Panel and accessories (allowance)',1,400);
+    if(st.bmsType==='legacy') L(hw,'Protocol gateway / controller upgrade (allowance)',1,p.upgrade);
+    L(sv,'Site survey and BMS point-list review',1,550);
+    if(st.bmsAccess==='read'){
+      L(sv,'BMS contractor: read-only data export (allowance)',1,1650);L(sv,'Bohio setup, dashboards and recommendations',1,1100);
+      L(sv,'Baseline and savings verification setup',1,800);L(sv,'Project management',1,400);mo=p.platform/2;
+      notes.push('Advisory mode: the AI recommends, the facility team applies changes. Same route Office-in-the-Loop used in its field trial.');
+    }else{
+      L(sv,'BMS contractor: point mapping, heartbeat and fallback logic (allowance)',1,p.contractor);L(sv,'Bohio integration and commissioning',1,2000);
+      L(sv,'Baseline and savings verification setup',1,800);L(sv,'Project management',1,800);
+      notes.push('AI writes setpoints at a supervisory BACnet priority; operator overrides and safety logic always win, and the BMS falls back to its schedule if the heartbeat stops.');
+    }
+  }else{
+    const units=N, conv=st.floors;
+    if(code==='B1'){L(hw,'RS485-to-Ethernet converter, one per floor (allowance)',conv,165);L(sv,'RS485 cabling per thermostat (allowance)',units,p.cable);L(sv,'Thermostat Modbus configuration',units,15)}
+    if(code==='B2'){L(hw,'Milesight WT301 LoRaWAN fan coil thermostat',units,cp(USD.wt301));L(sv,'Thermostat replacement',units,p.tstat)}
+    if(code==='B3'){L(hw,'Modbus fan coil thermostat (Hexa RT226 class)',units,cp(USD.hexa));L(hw,'RS485-to-Ethernet converter, one per floor (allowance)',conv,165);L(sv,'Thermostat replacement',units,p.tstat);L(sv,'RS485 cabling per thermostat (allowance)',units,p.cable)}
+    if(code==='C1'){L(hw,'Sensibo Air PRO IR controller (retail price)',units,cp(USD.sensibo));L(hw,'Wi-Fi access point, one per flat (allowance)',F,70);L(sv,'IR controller installation and pairing',units,10);L(sv,'Wi-Fi access point installation',F,25);notes.push('IR is one-way: the system cannot confirm the AC obeyed. Ask Sensibo for Airbend commercial pricing, which may cut hardware cost.')}
+    if(code==='C2'){L(hw,'Intesis AC-to-Modbus gateway, one per indoor unit',units,cp(USD.intesis));L(hw,'RS485-to-Ethernet converter, one per floor (allowance)',conv,165);L(sv,'Gateway installation in indoor unit',units,80);L(sv,'RS485 cabling per unit (allowance)',units,p.cable);notes.push('Gateway model depends on the AC brand; prices shown for Mitsubishi Electric.')}
+    if(code==='D1'){L(hw,'Milesight WT201 24 V LoRaWAN thermostat',units,cp(USD.wt201));L(sv,'Thermostat replacement',units,p.tstat)}
+    if(code==='E1'){L(hw,'Multi-unit VRF protocol gateway, up to 64 indoor units (allowance)',Math.max(1,Math.ceil(units/64)),1650);L(sv,'Gateway integration and VRF point mapping',1,1650)}
+    L(hw,'Milesight UG65 LoRaWAN gateway',Math.max(1,Math.ceil(units/40)),cp(USD.ug65));
+    L(hw,'Teltonika RUT956 4G router with VPN',1,cp(USD.rut956));
+    L(hw,'Revolution Pi edge controller (local logic, guardrails, fallback)',1,cp(USD.revpi));
+    L(hw,'Panel, UPS and accessories (allowance)',1,700);
+    const add=(n,q,u)=>{if(q>0){L(hw,n,q,u);sens+=q}}; let sens=0;
+    if(BT==='office') add('Milesight VS370 radar presence sensor, one per office zone',F*st.perFlat,cp(USD.vs370));
+    if(BT==='hotel'){add('Milesight WS202 motion sensor, one per guest room',F,cp(USD.ws202));add('Milesight WS301 room door contact, one per guest room',F,cp(USD.ws301))}
+    if(BT==='retail') add('Milesight WS202 motion sensor, one per shop',F,cp(USD.ws202));
+    if(BT==='villa') add('Milesight WS202 motion sensor, main living area per villa',F,cp(USD.ws202));
+    add('Milesight WS202 motion sensor, common areas',C,cp(USD.ws202));
+    if(sens) L(sv,'Sensor installation and pairing',sens,p.sensor);
+    if(st.cooling==='dc'){L(hw,'BTU meter data interface (allowance)',1,500);notes.push('District cooling: the controller keeps a hard limit on chilled-water return temperature so savings never trigger Delta T penalties.')}
+    else{const k=Math.min(F,6)+1;L(hw,'Milesight CT101 current clamp, sample metering',k,cp(USD.ct101));L(sv,'CT clamp installation (licensed electrician)',k,40)}
+    L(sv,'Site survey and compatibility audit',1,550);L(sv,'Gateway and network installation',1,700);L(sv,'Commissioning and configuration',1,2000);
+    L(sv,'Baseline and savings verification setup',1,800);L(sv,'Project management',1,800);L(sv,'Tenant communication and FM training',1,400);
+  }
+  if(st.occ&&BT==='apartment') L(op,'Occupancy sensor in each flat',F,cp(USD.ws202)+p.sensor);
+  if(st.balc&&BT!=='office'&&BT!=='retail') L(op,BALC[BT],F,cp(USD.ws301)+p.sensor);
+  notes.unshift(code[0]==='A'?'Occupancy: the AI reads the BMS\'s existing occupancy points where they exist; no new sensors are included on this route.':SENSE[BT]);
+  if(st.warr) L(op,'Extended warranty, years 2-3',1,1200);
+  const sum=a=>a.reduce((s,x)=>s+x.t,0), H=sum(hw), S=sum(sv), O=sum(op), one=H+S+O;
+  const monthly=N*mo+40;
+  return {code,N,hw,sv,op,H,S,O,one,monthly,perFlat:F?one/F:0,mo,notes};
+}
+/*ENDCALC*/
+const aed=v=>'$'+Math.round(v).toLocaleString('en-US');
+const DEF={btype:null,bms:null,bmsType:null,bmsAccess:null,equip:null,fcuComm:null,fcuChoice:'wireless',splitChoice:null,cooling:'dc',flats:20,perFlat:3,common:7,floors:5,occ:false,balc:false,warr:false,sizeTouched:false};
+let st=Object.assign({},DEF), p=Object.assign({},P0), cur=0;
+try{const s=JSON.parse(localStorage.getItem('bohioQuoterUSD')||'null');if(s){st=Object.assign(st,s.st);p=Object.assign(p,s.p);cur=s.cur||0}}catch(e){}
+const save=()=>{try{localStorage.setItem('bohioQuoterUSD',JSON.stringify({st,p,cur}))}catch(e){}};
+const Q={
+ btype:{t:'What type of building is it?',h:'This decides which occupancy sensors are used and how the building is sized.',o:[['apartment','Residential apartments','Flats with their own thermostats, shared lobby and corridors'],['office','Commercial office','Desks and meeting rooms; people sit still for hours'],['hotel','Hotel or serviced apartments','Guest rooms that are often empty during the day'],['retail','Retail or mall units','Shops with fixed opening hours'],['villa','Villa compound','Individual houses, often empty during travel']]},
+ bms:{t:'Does the building have a BMS?',h:'A building management system: a central PC or panel that runs the HVAC. Check the plant room or ask the facility manager.',o:[['yes','Yes','Central controls, a BMS screen or controllers in a panel'],['no','No','Each room has its own thermostat or AC remote'],['unsure','Not sure yet','Quoted as no BMS until confirmed']]},
+ bmsType:{t:'What kind of BMS is it?',h:'Look at the brand on the screen or controllers, or ask the BMS contractor.',o:[['open','Modern and open','BACnet/IP or Tridium Niagara, installed in the last ~15 years'],['legacy','Legacy or proprietary','Older panels, N2, LON or a closed vendor system'],['unsure','Not sure','Quoted as modern; confirm with the contractor']]},
+ bmsAccess:{t:'Will the AI be allowed to write setpoints?',h:'The building owner and BMS contractor must agree to supervisory write access.',o:[['write','Yes, write access','AI adjusts setpoints and schedules directly'],['read','Read-only for now','AI recommends, the facility team applies the changes']]},
+ equip:{t:'What cooling equipment serves the flats?',h:'Check the indoor unit or the thermostat on the wall.',o:[['fcu','Chilled-water fan coils','Wall thermostats with fan speeds; district cooling or a central chiller'],['split','Wall-mounted split ACs','Each AC has its own hand-held remote'],['ducted','Ducted DX or packaged units','24 V thermostats, often marked with stages (STG 1)'],['vrf','VRF system','Many indoor units on one outdoor system with a central controller']]},
+ fcuComm:{t:'Do the existing thermostats have Modbus terminals?',h:'With power off, look behind the thermostat for RS485 terminals marked A/B or + and -.',o:[['yes','Yes, A/B or RS485 terminals','Keep them and wire a communication bus'],['no','No, only power and fan/valve wires','Thermostats need replacing'],['unsure','Not sure','Quoted as replacement until checked']]},
+ fcuChoice:{t:'How should the new thermostats connect?',h:'Wireless avoids running cables through occupied flats.',o:[['wireless','Wireless LoRaWAN (recommended)','Fast install, no new cables'],['wired','Wired Modbus','Cheaper units, but needs RS485 cabling per thermostat']]},
+ splitChoice:{t:'How should the split ACs be controlled?',h:'This is the main trade-off between price and reliability.',o:[['ir','IR controllers','Cheaper and fast to fit, but one-way'],['wired','Wired gateways','Two-way and reliable, one gateway per indoor unit']]},
+ cooling:{t:'How is cooling metered?',h:'Savings must be measured to be credible.',o:[['dc','District cooling with a BTU meter','Empower, Tabreed or similar'],['elec','Electricity bill only','Sample metering with current clamps']]}
+};
+const LBL={btype:'Building',bms:'BMS',bmsType:'BMS type',bmsAccess:'Access',equip:'Equipment',fcuComm:'Thermostats',fcuChoice:'Connection',splitChoice:'Control',cooling:'Metering',size:'Size',options:'Options',quote:'Quote'};
+function steps(){const s=['btype','bms'];if(st.bms==='yes')s.push('bmsType','bmsAccess');else if(st.bms){s.push('equip');if(st.equip==='fcu'){s.push('fcuComm');if(st.fcuComm&&st.fcuComm!=='yes')s.push('fcuChoice')}if(st.equip==='split')s.push('splitChoice');s.push('cooling')}s.push('size','options','quote');return s}
+function route(){if(st.bms==='yes')return st.bmsType==='legacy'?'A2':(st.bmsAccess==='read'?'A3':'A1');if(!st.bms||!st.equip)return null;
+ if(st.equip==='fcu')return st.fcuComm==='yes'?'B1':(st.fcuChoice==='wired'?'B3':'B2');if(st.equip==='split')return st.splitChoice==='wired'?'C2':'C1';return st.equip==='ducted'?'D1':'E1'}
+const answered=k=>Q[k]?st[k]!=null:true;
+function pick(k,v){st[k]=v;if((k==='equip'||k==='btype')&&!st.sizeTouched){const d=TYPES[st.btype||'apartment'];st.flats=d[2];st.common=d[4];st.perFlat=st.equip==='ducted'?1:d[3]}render()}
+const metro=document.getElementById('metro'),q=document.getElementById('q'),tk=document.getElementById('ticket');
+function render(){
+ const S=steps();if(cur>=S.length)cur=S.length-1;const k=S[cur];
+ metro.innerHTML=S.map((s,i)=>`<button class="st ${i<cur?'done':i===cur?'cur':''}" data-i="${i}" ${i>cur&&!S.slice(0,i).every(answered)?'disabled':''}><span class="dot"></span>${LBL[s]}</button>`).join('');
+ const back=cur>0?'<button class="btn ghost" id="back">Back</button>':'<span></span>';
+ if(Q[k]){const d=Q[k];
+  q.innerHTML=`<h2>${d.t}</h2><p class="help">${d.h}</p><div class="opts">${d.o.map(([v,l,s])=>`<button class="opt ${st[k]===v?'on':''}" data-k="${k}" data-v="${v}"><span class="ring"></span><span><b>${l}</b><span>${s}</span></span></button>`).join('')}</div><div class="nav">${back}<button class="btn" id="next" ${answered(k)?'':'disabled'}>Next</button></div>`;
+ }else if(k==='size'){
+  const N=st.flats*st.perFlat+st.common;
+  const T=TYPES[st.btype||'apartment'];
+  q.innerHTML=`<h2>How big is the building?</h2><p class="help">Indoor units are what get a thermostat or controller. Starting values are typical for this building type; change them to match the site.</p>
+  <div class="fields"><label class="f">${T[0]}<input type="number" min="1" id="flats" value="${st.flats}"></label>
+  <label class="f">Indoor units per ${T[1]}<small>Rooms or zones with their own unit</small><input type="number" min="0" id="perFlat" value="${st.perFlat}"></label>
+  <label class="f">Common-area units<small>Lobby, corridors, gym</small><input type="number" min="0" id="common" value="${st.common}"></label>
+  <label class="f">Floors<input type="number" min="1" id="floors" value="${st.floors}"></label></div>
+  <p class="note">Total indoor units: <b class="num">${N}</b></p><div class="nav">${back}<button class="btn" id="next">Next</button></div>`;
+ }else if(k==='options'){
+  const c=(id,l,s)=>`<label class="chk"><input type="checkbox" id="${id}" ${st[id]?'checked':''}><div><b>${l}</b><span>${s}</span></div></label>`;
+  q.innerHTML=`<h2>Any optional extras?</h2><p class="help">Priced separately and added to the one-time total. The occupancy sensors for this building type are already included in the quote.</p>
+  ${st.btype==='apartment'||!st.btype?c('occ','Occupancy sensor in each flat','Detects empty flats for automatic setback; needs tenant consent'):''}${BALC[st.btype||'apartment']?c('balc',BALC[st.btype||'apartment'],'Pauses cooling while the door is open'):''}${c('warr','Extended warranty, years 2-3','Hardware replacement and on-site visits')}
+  <details><summary>Pricing assumptions</summary><div class="fields" style="margin-top:10px">
+  <label class="f">Hardware margin %<input type="number" id="p_margin" value="${p.margin}"></label><label class="f">Shipping + customs %<input type="number" id="p_landed" value="${p.landed}"></label>
+  <label class="f">Thermostat swap, USD<input type="number" id="p_tstat" value="${p.tstat}"></label><label class="f">RS485 cable per unit, USD<input type="number" id="p_cable" value="${p.cable}"></label>
+  <label class="f">Platform fee per unit / month, USD<input type="number" step="0.5" id="p_platform" value="${p.platform}"></label><label class="f">BMS contractor allowance, USD<input type="number" id="p_contractor" value="${p.contractor}"></label></div>
+  <p class="note">Hardware = online price in USD × (1 + shipping) × (1 + margin). All prices in US dollars. Reset clears all answers.</p><button class="btn ghost" id="reset">Reset everything</button></details>
+  <div class="nav">${back}<button class="btn" id="next">See the quote</button></div>`;
+ }else quoteView(back);
+ ticket();save();
+}
+function ticket(){
+ const c=route(),m=document.getElementById('mcode'),mt=document.getElementById('mtot');
+ if(!c){tk.innerHTML=`<p class="rname">Live quote</p><p class="note">Answer the first questions to pick a route. Prices are for the building size on the Size step.</p>`;m.textContent='Answer to price';mt.textContent='';return}
+ const r=price(c,st,p);
+ tk.innerHTML=`<span class="code">${c}</span><p class="rname">${NAMES[c]}</p><span class="risk ${RISK[c][0]}">${RISK[c][1]}</span>
+ <div class="big">${aed(r.one)}</div><p class="note" style="margin:0 0 12px">one-time, excl. VAT</p>
+ <div class="kv"><span>Hardware</span><b>${aed(r.H)}</b></div><div class="kv"><span>Installation and setup</span><b>${aed(r.S)}</b></div>
+ ${r.O?`<div class="kv"><span>Optional extras</span><b>${aed(r.O)}</b></div>`:''}
+ <div class="kv"><span>Monthly service</span><b>${aed(r.monthly)} / mo</b></div><div class="kv"><span>Per ${TYPES[st.btype||'apartment'][1]}, one-time</span><b>${aed(r.perFlat)}</b></div>
+ ${st.bms==='unsure'?'<p class="warn">BMS not confirmed: quoted as no-BMS.</p>':''}${st.fcuComm==='unsure'&&st.equip==='fcu'&&st.bms!=='yes'?'<p class="warn">If the thermostats have Modbus terminals, route B1 applies and the price drops.</p>':''}`;
+ m.textContent=c+' · one-time';mt.textContent=aed(r.one);
+}
+function quoteView(back){
+ const c=route();
+ if(!c){q.innerHTML=`<h2>Not enough answers yet</h2><p class="help">Go back and answer the equipment questions.</p><div class="nav">${back}</div>`;return}
+ const r=price(c,st,p),rows=(t,a,suf='')=>`<tr class="grp"><td colspan="4">${t}</td></tr>`+a.map(x=>`<tr><td>${x.n}</td><td class="r">${x.q}</td><td class="r">${aed(x.u)}${suf}</td><td class="r">${aed(x.t)}${suf}</td></tr>`).join('');
+ const all=Object.keys(NAMES).map(k=>({k,v:price(k,st,p).one})),max=Math.max(...all.map(x=>x.v));
+ q.innerHTML=`<h2>Quote: route ${c}</h2><p class="help">${NAMES[c]} · ${TYPES[st.btype||'apartment'][0].toLowerCase().replace(/^./,c=>c.toUpperCase())}: ${st.flats}, ${r.N} indoor units, ${st.floors} floors. Prices in US dollars, excluding VAT.</p>
+ <div class="scroll"><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Unit</th><th class="r">Amount</th></tr></thead><tbody>
+ ${rows('Hardware',r.hw)}<tr class="tot"><td colspan="3">Hardware subtotal</td><td class="r">${aed(r.H)}</td></tr>
+ ${rows('Installation and setup',r.sv)}<tr class="tot"><td colspan="3">Services subtotal</td><td class="r">${aed(r.S)}</td></tr>
+ ${r.op.length?rows('Optional extras',r.op)+`<tr class="tot"><td colspan="3">Options subtotal</td><td class="r">${aed(r.O)}</td></tr>`:''}
+ <tr class="grp"><td colspan="4">Totals</td></tr><tr><td colspan="3">One-time, excl. VAT</td><td class="r">${aed(r.one)}</td></tr><tr><td colspan="3">VAT 5%</td><td class="r">${aed(r.one*.05)}</td></tr>
+ <tr class="tot"><td colspan="3">One-time, incl. VAT</td><td class="r">${aed(r.one*1.05)}</td></tr>
+ <tr><td colspan="3">Monthly service: ${r.N} units × $${r.mo} + $40 connectivity</td><td class="r">${aed(r.monthly)} / mo</td></tr><tr><td colspan="3">Annual service</td><td class="r">${aed(r.monthly*12)}</td></tr>
+ </tbody></table></div>
+ ${r.notes.map(n=>`<p class="warn">${n}</p>`).join('')}
+ <h2 style="font-size:20px;margin-top:26px">Every route for this building</h2><p class="help">Same size and options, priced for each kind of existing equipment.</p>
+ <div class="scroll"><table class="cmp"><tbody>${all.map(x=>`<tr class="${x.k===c?'me':''}"><td style="width:3em">${x.k}</td><td>${NAMES[x.k]}<div class="bar"><i style="width:${(x.v/max*100).toFixed(1)}%"></i></div></td><td class="r">${aed(x.v)}</td></tr>`).join('')}</tbody></table></div>
+ <h2 style="font-size:20px;margin-top:26px">How the system behaves</h2><div class="rules">
+ <div><b>Supervisory only</b>The AI changes setpoints and schedules; local controls keep safety and fallback.</div>
+ <div><b>Advisory, shadow, then live</b>Recommendations first, logged in shadow mode, then live control.</div>
+ <div><b>Measured savings</b>4-week baseline, then monthly savings reports. Target 15-25%, not guaranteed.</div></div>
+ <p class="note">Prices in US dollars: estimates from online list prices (converted at £1 = $1.30, €1 = $1.15) and assumed UAE labour rates. Confirm quantities and allowances after a site survey.</p>
+ <div class="nav">${back}<button class="btn" id="copy">Copy quote as text</button></div><p class="note" id="copied" role="status"></p>`;
+}
+function text(){const c=route(),r=price(c,st,p),l=x=>`- ${x.n}: ${x.q} × ${aed(x.u)} = ${aed(x.t)}`;
+ return [`Bohio Systems: HVAC optimisation quote (route ${c})`,NAMES[c],`${TYPES[st.btype||'apartment'][0]}: ${st.flats}, ${r.N} indoor units, ${st.floors} floors. US dollars, excl. VAT.`,'','Hardware',...r.hw.map(l),`Hardware subtotal: ${aed(r.H)}`,'','Installation and setup',...r.sv.map(l),`Services subtotal: ${aed(r.S)}`,
+ ...(r.op.length?['','Optional extras',...r.op.map(l),`Options subtotal: ${aed(r.O)}`]:[]),'',`One-time excl. VAT: ${aed(r.one)}`,`VAT 5%: ${aed(r.one*.05)}`,`One-time incl. VAT: ${aed(r.one*1.05)}`,`Monthly service: ${aed(r.monthly)} / month`,'',...r.notes,'Estimates; confirm after site survey.'].join('\n')}
+document.addEventListener('click',e=>{
+ const o=e.target.closest('.opt');if(o){pick(o.dataset.k,o.dataset.v);return}
+ const s=e.target.closest('.st');if(s&&!s.disabled){cur=+s.dataset.i;render();return}
+ const id=e.target.id;
+ if(id==='next'){cur++;render();window.scrollTo({top:0})}
+ else if(id==='back'){cur--;render()}
+ else if(id==='reset'){st=Object.assign({},DEF);p=Object.assign({},P0);cur=0;render()}
+ else if(id==='copy'){const out=document.getElementById('copied');navigator.clipboard.writeText(text()).then(()=>out.textContent='Copied. Paste it into an email or document.',()=>out.textContent='Copy was blocked by the browser.')}
+});
+document.addEventListener('input',e=>{const t=e.target,v=+t.value;
+ if(['flats','perFlat','common','floors'].includes(t.id)){if(Number.isFinite(v)&&v>=0){st[t.id]=Math.round(v);st.sizeTouched=true;ticket();const n=q.querySelector('.note b');if(n)n.textContent=st.flats*st.perFlat+st.common;save()}}
+ else if(t.id.startsWith('p_')){if(Number.isFinite(v)){p[t.id.slice(2)]=v;ticket();save()}}
+ else if(['occ','balc','warr'].includes(t.id)){st[t.id]=t.checked;ticket();save()}
+});
+render();
+}
+</script>
+</body>
+</html>

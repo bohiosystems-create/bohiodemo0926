@@ -1,0 +1,11 @@
+[project]
+name = "bohio"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["sqlalchemy>=2.0", "pydantic>=2.5"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

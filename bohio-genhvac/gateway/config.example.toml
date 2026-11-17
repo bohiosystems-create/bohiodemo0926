@@ -1,0 +1,20 @@
+# Gateway config. Copy per site, e.g. gateway/sites/<client>.toml
+mode = "shadow"                     # "shadow" (log only) or "live" (also needs --i-understand-live)
+model_url = "http://localhost:8000" # Gen-HVAC inference server
+stale_after_s = 900                 # readings older than this -> fallback to schedule
+replay = true                       # true when replaying historical CSVs
+
+[zones.lobby]
+min_c = 23.0
+max_c = 26.0
+max_step_change_c = 0.5
+
+[zones.office_north]
+min_c = 22.5
+max_c = 25.5
+max_step_change_c = 0.5
+
+[zones.meeting_room]
+min_c = 22.0
+max_c = 25.0
+max_step_change_c = 0.5
