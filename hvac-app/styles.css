@@ -130,3 +130,5 @@ pre.calc{white-space:pre;overflow-x:auto;font:11.5px/1.6 ui-monospace,Menlo,Cons
 .sel{display:flex;gap:8px;align-items:center}.sel select{flex:1}
 @media(prefers-reduced-motion:no-preference){.toast{transition:opacity .2s,transform .2s}.progress i{transition:width .25s}}
 @media print{.top,.tabs,.bar,.noprint,.toast,.sheet{display:none!important}body{padding:0}main{max-width:none}}
+
+.row .btn.ico{flex:0 0 54px;padding:0}
