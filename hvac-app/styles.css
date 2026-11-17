@@ -9,7 +9,6 @@ body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--font);letter-spa
 button{font:inherit;color:inherit}
 .top{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left));background:var(--bg);border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;letter-spacing:-.02em}
-.logo{width:26px;height:26px;border-radius:7px;background:var(--blue) radial-gradient(circle,var(--amber) 0 3.5px,transparent 4px)}
 main{padding:16px max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left));max-width:640px;margin:0 auto}
 h2{font-size:25px;line-height:1.15;margin:4px 0 14px;font-weight:700;letter-spacing:-.02em}
 h3{font-size:16px;margin:0 0 8px}
