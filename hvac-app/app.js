@@ -236,17 +236,11 @@ function renderTrack() {
   <div class="tile"><small>Cost, last ${k.days} days</small><b>AED ${num(k.cost)}</b></div><div class="tile"><small>Logged</small><b>${num(k.total)}</b><em style="color:var(--mute)">${k.nDays} days</em></div></div>
   <div style="margin:8px 0 10px"><select class="sm" data-bind="range" aria-label="Time frame">${[[7, '7 days'], [30, '30 days'], [0, 'All time']].map(([v, l]) => `<option value="${v}" ${S.range === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>${dailyChart(s)}${hourChart(s)}` : (s.baseline.length ? dailyChart(s) : '<p class="help" style="margin-top:12px">No readings yet. Add one, or import a CSV.</p>')}
   ${savingsCard(s)}
-  <div class="sec">Data</div><div class="row" style="margin-top:10px"><button class="btn" data-act="addReading" data-series="actual">Add reading</button><button class="btn ghost" data-act="importCSV" data-series="actual">Import CSV</button><button class="btn ghost" data-act="exportCSV">Export CSV</button></div>
-  ${recentList(s)}`;
+  <div class="sec">Data</div><div class="row" style="margin-top:10px"><button class="btn" data-act="addReading" data-series="actual">Add reading</button><button class="btn ghost" data-act="importCSV" data-series="actual">Import CSV</button><button class="btn ghost" data-act="exportCSV">Export CSV</button></div>`;
 }
 function siteCard(s) {
   const k = trackerKpis(s), sv = s.baseline.length && Tracker.savings(s.baseline, s.actual, s.tariff, s.grid);
   return `<button class="card click" data-act="openSite" data-id="${s.id}"><div class="top2"><span class="nm">${esc(s.name)}</span></div><div class="sub">${k ? `${num(k.total)} over ${k.nDays} days` : 'No readings yet'}${sv ? ` · saving ${sv.pct.toFixed(1)}%` : ''}</div></button>`;
-}
-function recentList(s) {
-  const e = [...s.actual.map((x) => ({ ...x, series: 'actual' })), ...s.baseline.map((x) => ({ ...x, series: 'baseline' }))].sort((a, b) => (a.t < b.t ? 1 : -1)).slice(0, 8);
-  if (!e.length) return '';
-  return `<div class="sec">Latest entries</div>${e.map((x) => `<div class="ent"><span>${x.t.slice(0, 16).replace('T', ' ')} · <b>${x.kwh == null ? 'meter anchor' : num(x.kwh, 1)}</b> <span class="note">${x.series}</span></span><button data-act="delEntry" data-series="${x.series}" data-t="${x.t}" aria-label="Delete entry">Delete</button></div>`).join('')}`;
 }
 function renderSiteSettings(s) {
   $('#app').innerHTML = `<button class="btn ghost sm" data-act="settingsBack">‹ Back</button><h2 style="margin-top:12px">Site settings</h2>
@@ -352,7 +346,6 @@ document.addEventListener('click', (e) => {
     case 'saveReading': saveReading(); break;
     case 'segSeries': { el.parentElement.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === el)); $('#r_series').value = d.v; break; }
     case 'segMode': { el.parentElement.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === el)); $('#r_mode').value = d.v; $('#r_lbl').textContent = d.v === 'use' ? 'kWh used in this interval' : 'Meter reading, cumulative kWh'; break; }
-    case 'delEntry': { const s = site(); s[d.series] = s[d.series].filter((x) => x.t !== d.t); render(); break; }
   }
 });
 $('#sheet').addEventListener('click', (e) => { if (e.target.id === 'sheet') closeSheet(); });
