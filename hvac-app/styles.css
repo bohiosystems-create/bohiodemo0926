@@ -44,6 +44,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 label.f{display:grid;gap:6px;font-size:13px;color:var(--mute);align-content:start}
 label.f small{color:var(--mute)}
 input,select{font:16px var(--font);color:var(--ink);padding:10px 12px;min-height:44px;border:1px solid var(--line);border-radius:14px;background:var(--panel);width:100%}
+select.sm{width:auto;min-height:34px;padding:4px 10px;font-size:14px;border-radius:12px}
 input:focus,select:focus{background:var(--bg);border-color:var(--line2);outline:none}
 .chk{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
 .chk input{width:20px;height:20px;min-height:0;accent-color:var(--ink);flex:none}
