@@ -15,7 +15,7 @@
   --blue:#b8a584;        /* accent (kept name for app.js): taupe beige, chart bars, progress */
   --amber:#6b5d45;       /* baseline line in charts: dark beige */
   --green:#37352f; --red:#37352f;
-  --tabh:62px;--barh:0px}
+  --tabh:54px;--barh:0px}
 *{box-sizing:border-box;min-width:0}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--font);letter-spacing:-.005em;-webkit-text-size-adjust:100%;overflow-x:clip;padding-bottom:calc(var(--tabh) + var(--barh) + env(safe-area-inset-bottom) + 16px)}
@@ -64,9 +64,10 @@ input:focus,select:focus{background:var(--bg);border-color:var(--line2);outline:
 .bar .tot small{display:block;font-weight:400;font-size:12px;color:var(--mute)}
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(3,1fr);background:var(--bg);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
 .tabs button{position:relative;display:grid;justify-items:center;align-content:center;gap:3px;height:var(--tabh);border:0;background:none;font-size:12px;color:var(--mute);cursor:pointer}
-.tabs button.on{color:var(--ink);font-weight:700}
-.tabs svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.tabs i{position:absolute;top:7px;left:calc(50% + 8px);font-style:normal;font-size:11px;min-width:18px;height:18px;line-height:18px;border-radius:999px;background:var(--panel2);border:1px solid var(--line2);color:var(--ink);text-align:center}
+.tabs button.on{color:var(--ink)}
+.tabs button.on svg{stroke-width:2.1}
+.tabs svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.tabs i{position:absolute;top:8px;left:calc(50% + 10px);font-style:normal;font-size:11px;min-width:18px;height:18px;line-height:18px;border-radius:999px;background:var(--panel2);border:1px solid var(--line2);color:var(--ink);text-align:center}
 .tabs i:empty{display:none}
 .hero{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px}
 .code{display:inline-block;font-weight:700;color:var(--ink);background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:1px 8px;font-size:13px}
