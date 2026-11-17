@@ -202,12 +202,12 @@ function dailyChart(s) {
   const xl = [0, Math.floor((days.length - 1) / 2), days.length - 1].filter((v, i, ar) => ar.indexOf(v) === i).map((i) => `<text x="${(L + i * bw + bw / 2).toFixed(1)}" y="${H - 6}" text-anchor="${i === 0 ? 'start' : i === days.length - 1 ? 'end' : 'middle'}">${fmtDay(days[i])}</text>`).join('');
   const hit = days.map((d, i) => `<rect x="${(L + i * bw).toFixed(1)}" y="${T}" width="${bw.toFixed(1)}" height="${ih}" fill="transparent" data-act="barTap" data-d="${d}"/>`).join('');
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily HVAC energy in kWh">${grid}${bars}${line}${xl}${hit}</svg>
-  <div class="legend"><span><i style="background:var(--blue)"></i>Actual kWh / day</span>${pts.length ? '<span><i style="background:var(--amber)"></i>Baseline</span>' : ''}</div><div class="readout" id="readout"></div>`;
+  <div class="legend"><span><i style="background:var(--blue)"></i>Actual</span>${pts.length ? '<span><i style="background:var(--amber)"></i>Baseline</span>' : ''}</div><div class="readout" id="readout"></div>`;
 }
 function hourChart(s) {
   const p = Tracker.hourProfile(s.actual); if (!p) return '';
   const W = 600, H = 110, L = 4, T = 6, B = 18, bw = (W - L) / 24, max = Math.max(...p, 1);
-  return `<div class="sec">Typical day: average kWh per hour</div><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Average energy by hour of day">${p.map((v, h) => { const ht = (v / max) * (H - T - B); return `<rect x="${(L + h * bw + 2).toFixed(1)}" y="${(H - B - ht).toFixed(1)}" width="${(bw - 4).toFixed(1)}" height="${ht.toFixed(1)}" rx="2" fill="var(--blue)" opacity=".85"/>`; }).join('')}${[0, 6, 12, 18, 23].map((h) => `<text x="${(L + h * bw + bw / 2).toFixed(1)}" y="${H - 4}" text-anchor="middle">${String(h).padStart(2, '0')}h</text>`).join('')}</svg>`;
+  return `<div class="sec">Typical day: average per hour</div><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Average energy by hour of day">${p.map((v, h) => { const ht = (v / max) * (H - T - B); return `<rect x="${(L + h * bw + 2).toFixed(1)}" y="${(H - B - ht).toFixed(1)}" width="${(bw - 4).toFixed(1)}" height="${ht.toFixed(1)}" rx="2" fill="var(--blue)" opacity=".85"/>`; }).join('')}${[0, 6, 12, 18, 23].map((h) => `<text x="${(L + h * bw + bw / 2).toFixed(1)}" y="${H - 4}" text-anchor="middle">${String(h).padStart(2, '0')}h</text>`).join('')}</svg>`;
 }
 function savingsCard(s) {
   if (!s.baseline.length) return `<div class="sec">Savings vs baseline</div><div class="row"><button class="btn ghost" data-act="importCSV" data-series="baseline">Import baseline CSV</button><button class="btn ghost" data-act="addReading" data-series="baseline">Add baseline reading</button></div>`;
@@ -220,7 +220,7 @@ function savingsCard(s) {
     `4. Saving %          (B - C) / B = ${f(r.saved)} / ${f(r.baseline)} = ${r.pct.toFixed(1)}%`, `5. Cost saved        kWh x tariff = ${f(r.saved)} x ${s.tariff} AED/kWh = AED ${f(aed, 0)}  (about ${usd(aed / AED_PER_USD)})`,
     `6. CO2 avoided  kWh x grid factor = ${f(r.saved)} x ${s.grid} kg/kWh / 1000 = ${r.tco2.toFixed(2)} tCO2e`].join('\n');
   const good = r.saved >= 0;
-  return `<div class="sec">Savings vs baseline</div><div class="tiles"><div class="tile"><small>Energy saved</small><b class="${good ? 'down' : 'up'}">${good ? '' : '+'}${f(Math.abs(r.saved), 0)} kWh</b><em>${r.pct.toFixed(1)}% vs baseline</em></div><div class="tile"><small>Cost ${good ? 'saved' : 'extra'}</small><b>AED ${f(Math.abs(aed), 0)}</b><em>≈ ${usd(Math.abs(aed) / AED_PER_USD)}</em></div></div>
+  return `<div class="sec">Savings vs baseline</div><div class="tiles"><div class="tile"><small>Energy saved</small><b class="${good ? 'down' : 'up'}">${good ? '' : '+'}${f(Math.abs(r.saved), 0)}</b><em>${r.pct.toFixed(1)}% vs baseline</em></div><div class="tile"><small>Cost ${good ? 'saved' : 'extra'}</small><b>AED ${f(Math.abs(aed), 0)}</b><em>≈ ${usd(Math.abs(aed) / AED_PER_USD)}</em></div></div>
   <pre class="calc">${esc(txt)}</pre>
   <div class="row"><button class="btn ghost sm" data-act="copyCalc">Copy</button></div>`;
 }
@@ -234,9 +234,9 @@ function renderTrack() {
   }
   const k = trackerKpis(s), sw = S.sites.length > 1 ? `<div class="sel"><select data-bind="siteSel" aria-label="Site">${S.sites.map((x) => `<option value="${x.id}" ${x.id === s.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>` : '';
   $('#app').innerHTML = `<div class="top2" style="align-items:center"><h2 style="margin:0">${esc(s.name)}</h2><button class="btn ghost sm" data-act="siteSettings" aria-label="Settings" style="min-width:40px;padding:6px 10px"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button></div>${sw ? `<div style="margin-top:10px">${sw}</div>` : ''}
-  ${k ? `<div class="tiles"><div class="tile"><small>Last ${k.days} days</small><b>${num(k.l7)} kWh</b>${k.delta != null ? `<em class="${k.delta > 0 ? 'up' : 'down'}">${k.delta > 0 ? '▲' : '▼'} ${Math.abs(k.delta).toFixed(1)}% vs prior 7 days</em>` : '<em style="color:var(--mute)">no prior week yet</em>'}</div>
-  <div class="tile"><small>Daily average</small><b>${num(k.avg)} kWh</b><em style="color:var(--mute)">to ${fmtDay(k.latest)}</em></div>
-  <div class="tile"><small>Cost, last ${k.days} days</small><b>AED ${num(k.cost)}</b><em style="color:var(--mute)">≈ ${usd(k.cost / AED_PER_USD)} at ${s.tariff} AED/kWh</em></div><div class="tile"><small>Logged</small><b>${num(k.total)} kWh</b><em style="color:var(--mute)">${k.nDays} days</em></div></div>
+  ${k ? `<div class="tiles"><div class="tile"><small>Last ${k.days} days</small><b>${num(k.l7)}</b>${k.delta != null ? `<em class="${k.delta > 0 ? 'up' : 'down'}">${k.delta > 0 ? '▲' : '▼'} ${Math.abs(k.delta).toFixed(1)}% vs prior 7 days</em>` : '<em style="color:var(--mute)">no prior week yet</em>'}</div>
+  <div class="tile"><small>Daily average</small><b>${num(k.avg)}</b><em style="color:var(--mute)">to ${fmtDay(k.latest)}</em></div>
+  <div class="tile"><small>Cost, last ${k.days} days</small><b>AED ${num(k.cost)}</b><em style="color:var(--mute)">≈ ${usd(k.cost / AED_PER_USD)}</em></div><div class="tile"><small>Logged</small><b>${num(k.total)}</b><em style="color:var(--mute)">${k.nDays} days</em></div></div>
   <div style="margin:8px 0 10px;max-width:200px"><select data-bind="range" aria-label="Time frame">${[[7, 'Last 7 days'], [30, 'Last 30 days'], [0, 'All time']].map(([v, l]) => `<option value="${v}" ${S.range === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>${dailyChart(s)}${hourChart(s)}` : (s.baseline.length ? dailyChart(s) : '<p class="help" style="margin-top:12px">No readings yet. Add one, or import a CSV.</p>')}
   ${savingsCard(s)}
   <div class="sec">Data</div><div class="row" style="margin-top:10px"><button class="btn" data-act="addReading" data-series="actual">Add reading</button><button class="btn ghost" data-act="importCSV" data-series="actual">Import CSV</button><button class="btn ghost" data-act="exportCSV">Export CSV</button></div>
@@ -244,12 +244,12 @@ function renderTrack() {
 }
 function siteCard(s) {
   const k = trackerKpis(s), sv = s.baseline.length && Tracker.savings(s.baseline, s.actual, s.tariff, s.grid);
-  return `<button class="card click" data-act="openSite" data-id="${s.id}"><div class="top2"><span class="nm">${esc(s.name)}</span></div><div class="sub">${k ? `${num(k.total)} kWh over ${k.nDays} days` : 'No readings yet'}${sv ? ` · saving ${sv.pct.toFixed(1)}%` : ''}</div></button>`;
+  return `<button class="card click" data-act="openSite" data-id="${s.id}"><div class="top2"><span class="nm">${esc(s.name)}</span></div><div class="sub">${k ? `${num(k.total)} over ${k.nDays} days` : 'No readings yet'}${sv ? ` · saving ${sv.pct.toFixed(1)}%` : ''}</div></button>`;
 }
 function recentList(s) {
   const e = [...s.actual.map((x) => ({ ...x, series: 'actual' })), ...s.baseline.map((x) => ({ ...x, series: 'baseline' }))].sort((a, b) => (a.t < b.t ? 1 : -1)).slice(0, 8);
   if (!e.length) return '';
-  return `<div class="sec">Latest entries</div>${e.map((x) => `<div class="ent"><span>${x.t.slice(0, 16).replace('T', ' ')} · <b>${x.kwh == null ? 'meter anchor' : num(x.kwh, 1) + ' kWh'}</b> <span class="note">${x.series}</span></span><button data-act="delEntry" data-series="${x.series}" data-t="${x.t}" aria-label="Delete entry">Delete</button></div>`).join('')}`;
+  return `<div class="sec">Latest entries</div>${e.map((x) => `<div class="ent"><span>${x.t.slice(0, 16).replace('T', ' ')} · <b>${x.kwh == null ? 'meter anchor' : num(x.kwh, 1)}</b> <span class="note">${x.series}</span></span><button data-act="delEntry" data-series="${x.series}" data-t="${x.t}" aria-label="Delete entry">Delete</button></div>`).join('')}`;
 }
 function renderSiteSettings(s) {
   $('#app').innerHTML = `<button class="btn ghost sm" data-act="settingsBack">‹ Back</button><h2 style="margin-top:12px">Site settings</h2>
@@ -348,7 +348,7 @@ document.addEventListener('click', (e) => {
     case 'delSite': if (confirm('Delete this site and all its readings?')) { S.sites = S.sites.filter((x) => x.id !== S.site); S.site = null; S.view = null; render(); } break;
     case 'clearSeries': if (confirm('Clear the baseline readings?')) { site()[d.series] = []; render(); } break;
     case 'range': S.range = +d.v; render(); break;
-    case 'barTap': { const s = site(), am = new Map(Tracker.daily(s.actual)), bm = new Map(Tracker.daily(s.baseline)); $('#readout').textContent = `${fmtDay(d.d)}: ${am.has(d.d) ? num(am.get(d.d), 1) + ' kWh actual' : 'no actual reading'}${bm.has(d.d) ? ` · baseline ${num(bm.get(d.d), 1)} kWh` : ''}`; break; }
+    case 'barTap': { const s = site(), am = new Map(Tracker.daily(s.actual)), bm = new Map(Tracker.daily(s.baseline)); $('#readout').textContent = `${fmtDay(d.d)}: ${am.has(d.d) ? num(am.get(d.d), 1) + ' actual' : 'no actual reading'}${bm.has(d.d) ? ` · baseline ${num(bm.get(d.d), 1)}` : ''}`; break; }
     case 'addReading': readingSheet(d.series); break;
     case 'importCSV': csvSheet(d.series); break;
     case 'exportCSV': exportCSV(); break;
