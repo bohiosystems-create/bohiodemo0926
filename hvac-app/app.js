@@ -237,7 +237,7 @@ function renderTrack() {
   ${k ? `<div class="tiles"><div class="tile"><small>Last ${k.days} days</small><b>${num(k.l7)} kWh</b>${k.delta != null ? `<em class="${k.delta > 0 ? 'up' : 'down'}">${k.delta > 0 ? '▲' : '▼'} ${Math.abs(k.delta).toFixed(1)}% vs prior 7 days</em>` : '<em style="color:var(--mute)">no prior week yet</em>'}</div>
   <div class="tile"><small>Daily average</small><b>${num(k.avg)} kWh</b><em style="color:var(--mute)">to ${fmtDay(k.latest)}</em></div>
   <div class="tile"><small>Cost, last ${k.days} days</small><b>AED ${num(k.cost)}</b><em style="color:var(--mute)">≈ ${usd(k.cost / AED_PER_USD)} at ${s.tariff} AED/kWh</em></div><div class="tile"><small>Logged</small><b>${num(k.total)} kWh</b><em style="color:var(--mute)">${k.nDays} days</em></div></div>
-  <div class="chips" role="group" aria-label="Chart range">${[[7, '7 days'], [30, '30 days'], [0, 'All']].map(([v, l]) => `<button class="chip ${S.range === v ? 'on' : ''}" data-act="range" data-v="${v}">${l}</button>`).join('')}</div>${dailyChart(s)}${hourChart(s)}` : (s.baseline.length ? dailyChart(s) : '<p class="help" style="margin-top:12px">No readings yet. Add one, or import a CSV.</p>')}
+  <div style="margin:8px 0 10px;max-width:200px"><select data-bind="range" aria-label="Time frame">${[[7, 'Last 7 days'], [30, 'Last 30 days'], [0, 'All time']].map(([v, l]) => `<option value="${v}" ${S.range === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>${dailyChart(s)}${hourChart(s)}` : (s.baseline.length ? dailyChart(s) : '<p class="help" style="margin-top:12px">No readings yet. Add one, or import a CSV.</p>')}
   ${savingsCard(s)}
   <div class="sec">Data</div><div class="row" style="margin-top:10px"><button class="btn" data-act="addReading" data-series="actual">Add reading</button><button class="btn ghost" data-act="importCSV" data-series="actual">Import CSV</button><button class="btn ghost" data-act="exportCSV">Export CSV</button></div>
   ${recentList(s)}`;
@@ -370,6 +370,7 @@ document.addEventListener('input', (e) => {
   else if (['occ', 'balc', 'warr'].includes(b)) { st[b] = t.checked; setBar(); save(); }
   else if (b === 'client' || b === 'building') { st[b] = t.value; save(); }
   else if (b === 'siteSel') { S.site = t.value; render(); }
+  else if (b === 'range') { S.range = +t.value; render(); }
   else if (b.startsWith('s_')) { const s = site(), f = b.slice(2); if (f === 'name') { if (t.value.trim()) s.name = t.value; } else { const v = +t.value; if (t.value !== '' && Number.isFinite(v) && v >= 0) s[f] = v; } save(); }
 });
 document.addEventListener('change', (e) => { if (e.target.dataset.bind === 'siteSel') { S.site = e.target.value; render(); } });
