@@ -219,8 +219,7 @@ function savingsCard(s) {
     `6. CO2 avoided  kWh x grid factor = ${f(r.saved)} x ${s.grid} kg/kWh / 1000 = ${r.tco2.toFixed(2)} tCO2e`].join('\n');
   const good = r.saved >= 0;
   return `<div class="sec">Savings vs baseline</div><div class="tiles"><div class="tile"><small>Energy saved</small><b class="${good ? 'down' : 'up'}">${good ? '' : '+'}${f(Math.abs(r.saved), 0)}</b><em>${r.pct.toFixed(1)}% vs baseline</em></div><div class="tile"><small>Cost ${good ? 'saved' : 'extra'}</small><b>AED ${f(Math.abs(aed), 0)}</b></div></div>
-  <pre class="calc">${esc(txt)}</pre>
-  <div class="row"><button class="btn ghost sm" data-act="copyCalc">Copy</button></div>`;
+  `;
 }
 function renderTrack() {
   const s = site();
@@ -354,7 +353,6 @@ document.addEventListener('click', (e) => {
     case 'segSeries': { el.parentElement.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === el)); $('#r_series').value = d.v; break; }
     case 'segMode': { el.parentElement.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === el)); $('#r_mode').value = d.v; $('#r_lbl').textContent = d.v === 'use' ? 'kWh used in this interval' : 'Meter reading, cumulative kWh'; break; }
     case 'delEntry': { const s = site(); s[d.series] = s[d.series].filter((x) => x.t !== d.t); render(); break; }
-    case 'copyCalc': { const t = document.querySelector('pre.calc'); navigator.clipboard.writeText(t.textContent).then(() => toast('Calculation copied'), () => toast('Copy was blocked by the browser.')); break; }
   }
 });
 $('#sheet').addEventListener('click', (e) => { if (e.target.id === 'sheet') closeSheet(); });
