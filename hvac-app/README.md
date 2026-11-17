@@ -21,4 +21,4 @@ BMS-contractor price; A2, B3, C1, C2 are blocked. Quotes are in USD.
 ## Tracker notes
 - CSV format: a time column and a kWh column, e.g. `timestamp,hvac_kwh`.
 - Savings are computed only over timestamps present in both baseline and actual; no weather or occupancy adjustment.
-- `demo/` holds the illustrative placeholder CSVs from the starter kit. They are not results.
+- `sample/` holds the placeholder CSVs from the starter kit (illustrative, not measured results).
