@@ -206,7 +206,7 @@ function dailyChart(s) {
 }
 function hourChart(s) {
   const p = Tracker.hourProfile(s.actual); if (!p) return '';
-  const W = 600, H = 110, L = 4, T = 6, B = 18, bw = (W - L) / 24, max = Math.max(...p, 1);
+  const W = 600, H = 250, L = 4, T = 6, B = 18, bw = (W - L) / 24, max = Math.max(...p, 1);
   CH.hour = { n: 24, L, bw, W, H, T, ih: H - T - B, label: (h) => `<b>${String(h).padStart(2, '0')}:00</b><span>${num(p[h], 1)}</span>` };
   return `<div class="sec">Hourly average</div><div class="chartwrap" data-chart="hour"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Average energy by hour of day">${p.map((v, h) => { const ht = (v / max) * (H - T - B); return `<rect class="b" data-i="${h}" x="${(L + h * bw + 2).toFixed(1)}" y="${(H - B - ht).toFixed(1)}" width="${(bw - 4).toFixed(1)}" height="${ht.toFixed(1)}" rx="2" fill="var(--blue)"/>`; }).join('')}${[0, 6, 12, 18, 23].map((h) => `<text x="${(L + h * bw + bw / 2).toFixed(1)}" y="${H - 4}" text-anchor="middle">${String(h).padStart(2, '0')}h</text>`).join('')}<line class="guide" y1="${T}" y2="${H - B}" stroke="var(--amber)" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/></svg><div class="tip" hidden></div></div>`;
 }
@@ -224,6 +224,22 @@ function savingsCard(s) {
   return `<div class="sec">Savings vs baseline</div><div class="tiles"><div class="tile"><small>Energy saved</small><b class="${good ? 'down' : 'up'}">${good ? '' : '+'}${f(Math.abs(r.saved), 0)}</b><em>${r.pct.toFixed(1)}% vs baseline</em></div><div class="tile"><small>Cost ${good ? 'saved' : 'extra'}</small><b>AED ${f(Math.abs(aed), 0)}</b></div></div>
   `;
 }
+const rangeSelect = () => `<div style="margin:8px 0 10px"><select class="sm" data-bind="range" aria-label="Time frame">${[[7, '7 days'], [30, '30 days'], [0, 'All time']].map(([v, l]) => `<option value="${v}" ${S.range === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`;
+/* the charts sit side by side: swipe sideways to move between them */
+function carousel(s) {
+  const slides = [rangeSelect() + dailyChart(s)], hr = hourChart(s);
+  if (hr) slides.push(hr);
+  const dots = slides.length > 1 ? `<div class="dots" role="tablist">${slides.map((_, i) => `<button class="${i ? '' : 'on'}" data-act="slide" data-i="${i}" aria-label="Chart ${i + 1}"></button>`).join('')}</div>` : '';
+  return `<div class="carousel" id="car">${slides.map((h) => `<div class="slide">${h}</div>`).join('')}</div>${dots}`;
+}
+function carouselSync() {
+  const c = $('#car'); if (!c) return;
+  const i = Math.round(c.scrollLeft / (c.clientWidth || 1));
+  document.querySelectorAll('.dots button').forEach((b, k) => b.classList.toggle('on', k === i));
+}
+document.addEventListener('scroll', (e) => {
+  if (e.target && e.target.id === 'car') { carouselSync(); document.querySelectorAll('[data-chart]').forEach(chartClear); }
+}, true);
 function renderTrack() {
   const s = site();
   if (S.view && S.view.settings && s) return renderSiteSettings(s);
@@ -237,7 +253,7 @@ function renderTrack() {
   ${k ? `<div class="tiles"><div class="tile"><small>Last ${k.days} days</small><b>${num(k.l7)}</b>${k.delta != null ? `<em class="${k.delta > 0 ? 'up' : 'down'}">${k.delta > 0 ? '▲' : '▼'} ${Math.abs(k.delta).toFixed(1)}% vs prior 7 days</em>` : '<em style="color:var(--mute)">no prior week yet</em>'}</div>
   <div class="tile"><small>Daily average</small><b>${num(k.avg)}</b><em style="color:var(--mute)">to ${fmtDay(k.latest)}</em></div>
   <div class="tile"><small>Cost, last ${k.days} days</small><b>AED ${num(k.cost)}</b></div><div class="tile"><small>Logged</small><b>${num(k.total)}</b><em style="color:var(--mute)">${k.nDays} days</em></div></div>
-  <div style="margin:8px 0 10px"><select class="sm" data-bind="range" aria-label="Time frame">${[[7, '7 days'], [30, '30 days'], [0, 'All time']].map(([v, l]) => `<option value="${v}" ${S.range === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>${dailyChart(s)}${hourChart(s)}` : (s.baseline.length ? dailyChart(s) : '<p class="help" style="margin-top:12px">No readings yet. Add one, or import a CSV.</p>')}
+  ${carousel(s)}` : (s.baseline.length ? dailyChart(s) : '<p class="help" style="margin-top:12px">No readings yet. Add one, or import a CSV.</p>')}
   ${savingsCard(s)}
   <div class="sec">Data</div><div class="row" style="margin-top:10px;align-items:center"><button class="btn" data-act="addReading" data-series="actual">Add reading</button><button class="icon-btn" data-act="importCSV" data-series="actual" aria-label="Import"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11 M7 11l5 5 5-5 M5 20h14"/></svg></button><button class="icon-btn" data-act="exportCSV" aria-label="Export"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V5 M7 9l5-5 5 5 M5 20h14"/></svg></button></div>`;
 }
@@ -370,6 +386,7 @@ document.addEventListener('click', (e) => {
     case 'settingsBack': S.view = null; render(); break;
     case 'delSite': if (confirm('Delete this site and all its readings?')) { S.sites = S.sites.filter((x) => x.id !== S.site); S.site = null; S.view = null; render(); } break;
     case 'clearSeries': if (confirm('Clear the baseline readings?')) { site()[d.series] = []; render(); } break;
+    case 'slide': { const c = $('#car'); c.scrollTo({ left: +d.i * c.clientWidth, behavior: 'smooth' }); break; }
     case 'range': S.range = +d.v; render(); break;
     case 'addReading': readingSheet(d.series); break;
     case 'importCSV': csvSheet(d.series); break;

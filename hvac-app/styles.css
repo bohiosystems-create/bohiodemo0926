@@ -133,7 +133,7 @@ pre.calc{white-space:pre;overflow-x:auto;font:11.5px/1.6 ui-monospace,Menlo,Cons
 
 
 .chartwrap{position:relative}
-.chartwrap svg.chart{cursor:crosshair;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.chartwrap svg.chart{cursor:crosshair;touch-action:pan-x pan-y;user-select:none;-webkit-user-select:none}
 .tip{position:absolute;top:0;z-index:2;pointer-events:none;display:grid;gap:1px;min-width:96px;padding:7px 10px;background:var(--bg);border:1px solid var(--line2);border-radius:12px;font-size:12px;line-height:1.35;color:var(--ink)}
 .tip[hidden]{display:none}
 .tip b{font-size:13px}
@@ -141,3 +141,12 @@ pre.calc{white-space:pre;overflow-x:auto;font:11.5px/1.6 ui-monospace,Menlo,Cons
 button.icon-btn:focus-visible{border-radius:12px;outline-offset:-2px}
 button.icon-btn.back{margin-left:-10px;justify-content:flex-start;padding-left:10px;width:48px}
 .row button.icon-btn.back{flex:0 0 48px;margin-left:-10px}
+
+.carousel{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.carousel::-webkit-scrollbar{display:none}
+.slide{flex:0 0 100%;scroll-snap-align:start;scroll-snap-stop:always}
+.slide>.sec:first-child{margin-top:12px}
+.dots{display:flex;justify-content:center;gap:4px;margin-top:2px}
+.dots button{width:28px;height:28px;border:0;background:none;padding:0;cursor:pointer;position:relative}
+.dots button::after{content:"";position:absolute;left:50%;top:50%;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;background:var(--line2)}
+.dots button.on::after{background:var(--ink)}
