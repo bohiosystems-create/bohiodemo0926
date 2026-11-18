@@ -79,7 +79,7 @@ input:focus,select:focus{background:var(--bg);border-color:var(--line2);outline:
 .warn{border-left:3px solid var(--line2);padding:10px 12px;background:var(--panel);border-radius:0 14px 14px 0;font-size:14px;margin:14px 0 0}
 .block{border:1px solid var(--line2);padding:12px 14px;background:var(--panel2);border-radius:14px;margin:14px 0}
 .block b{display:block}
-.sec{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:28px 0 4px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.sec{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:28px 0 4px;padding-bottom:6px}
 .li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:15px}
 .li div small{display:block;color:var(--mute);font-size:13px}
 .li b{white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:400}
